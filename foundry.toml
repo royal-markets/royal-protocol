@@ -1,0 +1,22 @@
+# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+fs_permissions = [{ access = "read", path = "./script"}]
+
+# Optimism chains upgrades: https://docs.optimism.io/builders/node-operators/network-upgrades/canyon
+# - Supports PUSH0 as of 2024-01-11
+# - Supports transient opcodes and MCOPY as of 2024-03-14
+solc = "0.8.26"
+evm_version = "cancun"
+
+# This is lame, but required by the Provenance contracts.
+via_ir=true
+
+# Make CREATE2 work as expected.
+#
+# See: https://github.com/foundry-rs/foundry/issues/6402#issuecomment-2074741336
+# See: https://github.com/foundry-rs/foundry/pull/6656
+always_use_create_2_factory = true
