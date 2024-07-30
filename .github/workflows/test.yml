@@ -1,0 +1,46 @@
+name: test
+
+on:
+  push:
+    branches: ["main"]
+    paths-ignore:
+      - README.md
+      - .gitignore
+  pull_request:
+    branches: ["*"]
+    paths-ignore:
+      - README.md
+      - .gitignore
+
+env:
+  FOUNDRY_PROFILE: ci
+
+jobs:
+  check:
+    timeout-minutes: 30
+    strategy:
+      fail-fast: true
+
+    name: forge test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Run Forge build
+        run: |
+          forge --version
+          forge build --sizes
+        id: build
+
+      - name: Run Forge tests
+        run: |
+          forge test -vvv
+        id: test

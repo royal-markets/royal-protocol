@@ -1,0 +1,37 @@
+name: lint
+
+on:
+  push:
+    branches: ["main"]
+    paths-ignore:
+      - README.md
+      - .gitignore
+  pull_request:
+    branches: ["*"]
+    paths-ignore:
+      - README.md
+      - .gitignore
+
+jobs:
+  check:
+    timeout-minutes: 30
+    strategy:
+      fail-fast: true
+
+    name: solhint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile # optional, --immutable
+
+      - name: Run solhint
+        run: yarn lint

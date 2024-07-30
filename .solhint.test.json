@@ -1,0 +1,22 @@
+{
+  "extends": "solhint:recommended",
+  "rules": {
+    "compiler-version": ["error", "^0.8.0"],
+
+    "constructor-syntax": "warn",
+    "func-visibility": ["warn", { "ignoreConstructors": true }],
+    "func-param-name-mixedcase": "warn",
+    "interface-starts-with-i": "warn",
+    "modifier-name-mixedcase": "warn",
+    "named-parameters-mapping": "warn",
+    "no-console": "warn",
+    "private-vars-leading-underscore": ["warn", { "strict": true }],
+
+    "foundry-test-functions": ["off", ["setUp"]],
+    "func-name-mixedcase": "off",
+    "func-named-parameters": "off",
+    "no-unused-import": "off",
+    "ordering": "off",
+    "var-name-mixedcase": "off"
+  }
+}

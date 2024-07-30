@@ -1,0 +1,33 @@
+name: slither
+
+on:
+  push:
+    branches: ["main"]
+    paths-ignore:
+      - README.md
+      - .gitignore
+  pull_request:
+    branches: ["*"]
+    paths-ignore:
+      - README.md
+      - .gitignore
+
+jobs:
+  check:
+    timeout-minutes: 10
+    strategy:
+      fail-fast: true
+
+    name: slither
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Run Slither
+        uses: crytic/slither-action@v0.4.0
+        with:
+          solc-version: "0.8.21"
+          slither-args: --skip-assembly
