@@ -41,6 +41,9 @@ contract ProvenanceRegistrar is Withdrawable, Initializable, UUPSUpgradeable {
     //                           EVENTS
     // =============================================================
 
+    /// @notice Emitted when the NFT contract is set.
+    event NftContractSet(address indexed oldNftContract, address indexed newNftContract);
+
     /// @notice Emitted when the IdRegistry is set.
     event IdRegistrySet(address indexed oldIdRegistry, address indexed newIdRegistry);
 
@@ -129,6 +132,13 @@ contract ProvenanceRegistrar is Withdrawable, Initializable, UUPSUpgradeable {
     // =============================================================
     //                          ADMIN FNs
     // =============================================================
+
+    /// @notice Set the address of the NFT contract.
+    function setNftContract(address nftContract_) external onlyRolesOrOwner(ADMIN) {
+        emit NftContractSet(nftContract, nftContract_);
+
+        nftContract = nftContract_;
+    }
 
     /// @notice Set the address of the IdRegistry contract.
     function setIdRegistry(address idRegistry_) external onlyRolesOrOwner(ADMIN) {

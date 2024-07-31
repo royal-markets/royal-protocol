@@ -18,6 +18,12 @@ contract ProvenanceToken is Withdrawable, ERC721 {
     /// @dev Emitted when the `contractURI` (ERC7572) is updated.
     event ContractURIUpdated();
 
+    /// @dev This event emits when the metadata of a token is changed. (ERC4906)
+    event MetadataUpdate(uint256 tokenId);
+
+    /// @dev This event emits when the metadata of a range of tokens is changed. (ERC4906)
+    event BatchMetadataUpdate(uint256 fromTokenId, uint256 toTokenId);
+
     // =============================================================
     //                        CONSTANTS
     // =============================================================
@@ -91,6 +97,16 @@ contract ProvenanceToken is Withdrawable, ERC721 {
         emit ContractURIUpdated();
     }
 
+    /// @notice Update the metadata for a token (ERC4906). (Only callable by ADMIN role or OWNER)
+    function updateTokenMetadata(uint256 tokenId) external onlyRolesOrOwner(ADMIN) {
+        emit MetadataUpdate(tokenId);
+    }
+
+    /// @notice Update the metadata for a range of tokens (ERC4906). (Only callable by ADMIN role or OWNER)
+    function updateBatchTokenMetadata(uint256 fromTokenId, uint256 toTokenId) external onlyRolesOrOwner(ADMIN) {
+        emit BatchMetadataUpdate(fromTokenId, toTokenId);
+    }
+
     // =============================================================
     //                        MINTING
     // =============================================================
@@ -159,6 +175,15 @@ contract ProvenanceToken is Withdrawable, ERC721 {
 
         // Example: https://example.com/path/to/contract/metadata/{tokenId}
         return string.concat(metadataUrl, LibString.toString(tokenId));
+    }
+
+    // =============================================================
+    //                      ERC4906 FUNCTIONS
+    // =============================================================
+
+    /// @dev Implements the ERC4906 interface. (In addition to the ERC721 interface).
+    function supportsInterface(bytes4 interfaceId) public view override returns (bool) {
+        return interfaceId == bytes4(0x49064906) || super.supportsInterface(interfaceId);
     }
 }
 /* solhint-enable comprehensive-interface */
