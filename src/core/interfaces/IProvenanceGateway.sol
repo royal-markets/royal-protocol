@@ -5,14 +5,15 @@ import {IProvenanceRegistry} from "./IProvenanceRegistry.sol";
 import {IIdRegistry} from "./IIdRegistry.sol";
 
 interface IProvenanceGateway {
-    // NOTE: None of these events are actually emitted by ProvenanceGateway, but because they are emitted when calling IdRegistry.register(),
-    //       they are included here so that ProvenanceGateway's ABI includes them.
-    //
     // =============================================================
     //                           EVENTS
     // =============================================================
 
     /// @dev Emitted when a new ProvenanceClaim is registered.
+    ////
+    /// NOTE: This event is not actually emitted by ProvenanceGateway,
+    ///       but because it is emitted when calling ProvenanceRegistry.register(),
+    ///       it is included here.
     event ProvenanceRegistered(
         uint256 id,
         uint256 indexed originatorId,
@@ -105,7 +106,7 @@ interface IProvenanceGateway {
      * - The registrar must have permission to register provenance on behalf of the originator.
      *
      * @param originatorId The RoyalProtocol ID of the originator.
-     * @param contentHash The keccak256 hash of the content which this ProvenanceClaim represents.
+     * @param contentHash The blake3 hash of the content which this ProvenanceClaim represents.
      * @param nftContract The NFT contract of the associated NFT of this ProvenanceClaim.
      * @param nftTokenId The token ID of the NFT associated with this ProvenanceClaim.
      *
@@ -129,7 +130,7 @@ interface IProvenanceGateway {
      *       has permission to register **this** provenance claim on behalf of the originator.
      *
      * @param originatorId The RoyalProtocol ID of the originator.
-     * @param contentHash The keccak256 hash of the content which this ProvenanceClaim represents.
+     * @param contentHash The blake3 hash of the content which this ProvenanceClaim represents.
      * @param nftContract The NFT contract of the associated NFT of this ProvenanceClaim.
      * @param nftTokenId The token ID of the NFT associated with this ProvenanceClaim.
      * @param deadline The expiration timestamp for the signature.

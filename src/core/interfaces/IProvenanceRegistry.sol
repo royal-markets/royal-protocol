@@ -11,7 +11,7 @@ interface IProvenanceRegistry {
      *
      * @param originatorId The RoyalProtocol ID of the originator. (who created the content which this ProvenanceClaim represents).
      * @param registrarId The RoyalProtocol ID of the registrar. (who registered this ProvenanceClaim on behalf of the originator).
-     * @param contentHash The keccak256 hash of the content which this ProvenanceClaim represents.
+     * @param contentHash The blake3 hash of the content which this ProvenanceClaim represents.
      *
      * @param nftContract The NFT contract of the associated NFT of this ProvenanceClaim.
      * @param nftTokenId The token ID of the NFT associated with this ProvenanceClaim.
@@ -100,7 +100,7 @@ interface IProvenanceRegistry {
      *
      * @param originatorId The RoyalProtocol ID of the originator.
      * @param registrarId The RoyalProtocol ID of the registrar.
-     * @param contentHash The keccak256 hash of the content which this ProvenanceClaim represents.
+     * @param contentHash The blake3 hash of the content which this ProvenanceClaim represents.
      * @param nftContract The NFT contract of the associated NFT of this ProvenanceClaim.
      * @param nftTokenId The token ID of the NFT associated with this ProvenanceClaim.
      */
