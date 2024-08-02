@@ -45,8 +45,8 @@ The v1.0 contracts are deployed on both Base Mainnet and Base Sepolia, to the sa
 | IdRegistry         | [0x00000000F74144b0dF049137A0F9416a920F2514](https://basescan.org/address/0x00000000F74144b0dF049137A0F9416a920F2514) |
 | IdGateway          | [0x000000005F8bda585d7D2b1A0b7e29e12a94910a](https://basescan.org/address/0x000000005F8bda585d7D2b1A0b7e29e12a94910a) |
 | UsernameGateway    | [0x00000000A3B81eB162644186b972C0b6a6f5b8E0](https://basescan.org/address/0x00000000A3B81eB162644186b972C0b6a6f5b8E0) |
-| ProvenanceRegistry | [0x00000000956fF4AD0c5b076fB77C23a2B0EaD0D9](https://basescan.org/address/0x00000000956fF4AD0c5b076fB77C23a2B0EaD0D9) |
-| ProvenanceGateway  | [0x00000000D224D4E84852C3EBE334aE0E914620d3](https://basescan.org/address/0x00000000D224D4E84852C3EBE334aE0E914620d3) |
+| ProvenanceRegistry | [0x00000000ec5beA5022AfDCB7b5d70026F30c0431](https://basescan.org/address/0x00000000ec5beA5022AfDCB7b5d70026F30c0431) |
+| ProvenanceGateway  | [0x00000000C8eBA014D75c66d09218728CBa7fB209](https://basescan.org/address/0x00000000C8eBA014D75c66d09218728CBa7fB209) |
 
 ## Contributing
 
