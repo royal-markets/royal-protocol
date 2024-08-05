@@ -13,8 +13,8 @@ contract DeployProvenanceSystem is Script {
     // =============================================================
 
     // NOTE: Get initcode hashes from CalculateSalts script, and then salts from maldon (or create2crunch/cast).
-    bytes32 provenanceRegistrySalt = 0x0000000000000000000000000000000000000000c1638af5854f000025fb2bd5;
-    bytes32 provenanceGatewaySalt = 0x0000000000000000000000000000000000000000904247ca019d0000ccd75c91;
+    bytes32 provenanceRegistrySalt = 0x00000000000000000000000000000000000000006294e7302ec4000020d23464;
+    bytes32 provenanceGatewaySalt = 0x00000000000000000000000000000000000000007cecb2788cc4000014f0b433;
 
     address public constant OWNER = 0x62Bd6bD77403268E387a8c7e09aF5D3127186be8;
 

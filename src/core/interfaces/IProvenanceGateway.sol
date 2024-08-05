@@ -39,14 +39,23 @@ interface IProvenanceGateway {
     /// @dev Error emitted when the registrar has no RoyalProtocol ID.
     error RegistrarDoesNotExist();
 
+    /// @dev Revert when an originator has already registered a given bytes32 contentHash.
+    error ContentHashAlreadyRegistered();
+
+    /// @dev Revert when an NFT tokenId was provided on registration sbut the contract address was not.
+    error NftContractRequired();
+
     /// @dev Error emitted when the NFT token is not owned by the originator.
     error NftNotOwnedByOriginator();
 
     /// @dev Error emitted when the NFT token has already been used by a different ProvenanceClaim.
     error NftTokenAlreadyUsed();
 
-    /// @dev Revert when an originator has already registered a given bytes32 contentHash.
-    error ContentHashAlreadyRegistered();
+    /// @dev Error emitted when the ProvenanceClaim ID does not exist.
+    error ProvenanceClaimDoesNotExist();
+
+    /// @dev Error emitted when the ProvenanceClaim already has an assigned NFT.
+    error NftAlreadyAssigned();
 
     /// @dev Revert when the signature provided is invalid.
     error InvalidSignature();
@@ -69,6 +78,9 @@ interface IProvenanceGateway {
 
     /// @notice The EIP712 typehash for Register signatures (for registering ProvenanceClaims).
     function REGISTER_TYPEHASH() external view returns (bytes32);
+
+    /// @notice The EIP712 typehash for AssignNft signatures (for assigning NFTs to an existing ProvenanceClaim without an assigned NFT).
+    function ASSIGN_NFT_TYPEHASH() external view returns (bytes32);
 
     // =============================================================
     //                           IMMUTABLES
@@ -146,6 +158,53 @@ interface IProvenanceGateway {
         uint256 deadline,
         bytes calldata sig
     ) external returns (uint256 id);
+
+    // =============================================================
+    //                          ASSIGNING NFTs
+    // =============================================================
+
+    /**
+     * @notice Assign an NFT to an existing ProvenanceClaim without an assigned NFT.
+     *
+     * Requirements:
+     * - The ProvenanceClaim ID must be valid.
+     * - The ProvenanceClaim must not already have an NFT assigned.
+     * - The NFT token must be owned by the originator.
+     * - The NFT token must not have been used in a ProvenanceClaim before.
+     * - The assigner must have permission to assign an NFT on behalf of the originator.
+     *
+     * @param provenanceClaimId The RoyalProtocol ProvenanceClaim ID to assign an NFT to.
+     * @param nftContract The NFT contract to associate with this ProvenanceClaim.
+     * @param nftTokenId The token ID of the NFT to associate with this ProvenanceClaim.
+     */
+    function assignNft(uint256 provenanceClaimId, address nftContract, uint256 nftTokenId) external;
+
+    /**
+     * @notice Assign an NFT to an existing ProvenanceClaim without an assigned NFT.
+     *
+     * Requirements:
+     * - The ProvenanceClaim ID must be valid.
+     * - The ProvenanceClaim must not already have an NFT assigned.
+     * - The NFT token must be owned by the originator.
+     * - The NFT token must not have been used in a ProvenanceClaim before.
+     *
+     * NOTE: The assigner here doesn't need to be delegated on the delegateRegistry,
+     *       because having an EIP712 signature is enough to prove that the assigner
+     *       has permission to assign an NFT to **this** provenance claim on behalf of the originator.
+     *
+     * @param provenanceClaimId The RoyalProtocol ProvenanceClaim ID to assign an NFT to.
+     * @param nftContract The NFT contract to associate with this ProvenanceClaim.
+     * @param nftTokenId The token ID of the NFT to associate with this ProvenanceClaim.
+     * @param deadline The expiration timestamp for the signature.
+     * @param sig The EIP712 "AssignNft" signature from the originator. (Signed by either custody or operator address).
+     */
+    function assignNftFor(
+        uint256 provenanceClaimId,
+        address nftContract,
+        uint256 nftTokenId,
+        uint256 deadline,
+        bytes calldata sig
+    ) external;
 
     // =============================================================
     //                      PERMISSIONED ACTIONS

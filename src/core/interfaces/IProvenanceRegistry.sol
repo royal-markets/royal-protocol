@@ -13,8 +13,8 @@ interface IProvenanceRegistry {
      * @param registrarId The RoyalProtocol ID of the registrar. (who registered this ProvenanceClaim on behalf of the originator).
      * @param contentHash The blake3 hash of the content which this ProvenanceClaim represents.
      *
-     * @param nftContract The NFT contract of the associated NFT of this ProvenanceClaim.
-     * @param nftTokenId The token ID of the NFT associated with this ProvenanceClaim.
+     * @param nftContract The NFT contract of the associated NFT of this ProvenanceClaim (optional).
+     * @param nftTokenId The token ID of the NFT associated with this ProvenanceClaim (optional).
      */
     struct ProvenanceClaim {
         uint256 originatorId;
@@ -38,6 +38,9 @@ interface IProvenanceRegistry {
         address nftContract,
         uint256 nftTokenId
     );
+
+    /// @dev Emitted when an NFT is assigned to an existing ProvenanceClaim without an NFT.
+    event NftAssigned(uint256 indexed provenanceClaimId, address nftContract, uint256 nftTokenId);
 
     /// @dev Emitted when the Owner sets the ProvenanceGateway to a new value.
     event ProvenanceGatewaySet(address oldProvenanceGateway, address newProvenanceGateway);
@@ -78,7 +81,7 @@ interface IProvenanceRegistry {
     /// @notice The last ProvenanceClaim ID that was issued.
     function idCounter() external view returns (uint256);
 
-    /// @notice The ProvenanceClaim ID for a given NFT token.
+    /// @notice The ProvenanceClaim ID for a given NFT token. (If one has been associated).
     function provenanceClaimIdOfNftToken(address nftContract, uint256 nftTokenId) external view returns (uint256);
 
     /// @notice The ProvenanceClaim ID for a given originator and content hash.
@@ -101,8 +104,8 @@ interface IProvenanceRegistry {
      * @param originatorId The RoyalProtocol ID of the originator.
      * @param registrarId The RoyalProtocol ID of the registrar.
      * @param contentHash The blake3 hash of the content which this ProvenanceClaim represents.
-     * @param nftContract The NFT contract of the associated NFT of this ProvenanceClaim.
-     * @param nftTokenId The token ID of the NFT associated with this ProvenanceClaim.
+     * @param nftContract The NFT contract of the associated NFT of this ProvenanceClaim. (Optional)
+     * @param nftTokenId The token ID of the NFT associated with this ProvenanceClaim. (Optional - but required if `nftContract` is included.)
      */
     function unsafeRegister(
         uint256 originatorId,
@@ -111,6 +114,24 @@ interface IProvenanceRegistry {
         address nftContract,
         uint256 nftTokenId
     ) external returns (uint256 id);
+
+    /**
+     * @notice Assign an NFT to a ProvenanceClaim.
+     *
+     * Requirements:
+     * - The ProvenanceRegistry must not be paused.
+     * - Only callable by the ProvenanceGateway (validation happens there).
+     * - Validation happens in ProvenanceGateway:
+     *   - The ProvenanceClaim must exist.
+     *   - The ProvenanceClaim must not already have an assigned NFT.
+     *   - The NFT must not have been used in a ProvenanceClaim before.
+     *   - The NFT must be owned by the originator.
+     *
+     * @param provenanceClaimId The RoyalProtocol ProvenanceClaim ID we wish to attach an NFT to.
+     * @param nftContract The NFT contract of the NFT that will be associated with this ProvenanceClaim.
+     * @param nftTokenId The token ID of the NFT that will be associated with this ProvenanceClaim.
+     */
+    function unsafeAssignNft(uint256 provenanceClaimId, address nftContract, uint256 nftTokenId) external;
 
     // =============================================================
     //                          ONLY OWNER
