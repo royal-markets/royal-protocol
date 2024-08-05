@@ -27,12 +27,12 @@ contract ProvenanceRegistry is IProvenanceRegistry, Withdrawable {
     uint256 public idCounter = 0;
 
     /// @inheritdoc IProvenanceRegistry
-    mapping(address nftContract => mapping(uint256 nftTokenId => uint256 provenanceClaimId)) public
-        provenanceClaimIdOfNftToken;
-
-    /// @inheritdoc IProvenanceRegistry
     mapping(uint256 originatorId => mapping(bytes32 contentHash => uint256 claimId)) public
         provenanceClaimIdOfOriginatorAndHash;
+
+    /// @inheritdoc IProvenanceRegistry
+    mapping(address nftContract => mapping(uint256 nftTokenId => uint256 provenanceClaimId)) public
+        provenanceClaimIdOfNftToken;
 
     /// @dev Internal lookup for ProvenanceClaim by ID.
     ///
@@ -89,11 +89,13 @@ contract ProvenanceRegistry is IProvenanceRegistry, Withdrawable {
             blockNumber: block.number
         });
 
-        // Mark the NFT token as used
-        provenanceClaimIdOfNftToken[nftContract][nftTokenId] = id;
-
         // Mark the originator and content hash as used
         provenanceClaimIdOfOriginatorAndHash[originatorId][contentHash] = id;
+
+        // Mark the NFT token as used, if included
+        if (nftContract != address(0)) {
+            provenanceClaimIdOfNftToken[nftContract][nftTokenId] = id;
+        }
 
         // Emit an event
         emit ProvenanceRegistered({
@@ -104,6 +106,27 @@ contract ProvenanceRegistry is IProvenanceRegistry, Withdrawable {
             nftContract: nftContract,
             nftTokenId: nftTokenId
         });
+    }
+
+    /// @inheritdoc IProvenanceRegistry
+    function unsafeAssignNft(uint256 provenanceClaimId, address nftContract, uint256 nftTokenId)
+        external
+        override
+        whenNotPaused
+        onlyProvenanceGateway
+    {
+        // Get the existing provenance claim
+        ProvenanceClaim storage pc = _provenanceClaim[provenanceClaimId];
+
+        // Set the provenance claim NFT data
+        pc.nftContract = nftContract;
+        pc.nftTokenId = nftTokenId;
+
+        // Mark the NFT token as used
+        provenanceClaimIdOfNftToken[nftContract][nftTokenId] = provenanceClaimId;
+
+        // Emit an event
+        emit NftAssigned({provenanceClaimId: provenanceClaimId, nftContract: nftContract, nftTokenId: nftTokenId});
     }
 
     // =============================================================

@@ -33,6 +33,11 @@ contract ProvenanceGateway is IProvenanceGateway, Withdrawable, EIP712, Nonces {
         "Register(uint256 originatorId,bytes32 contentHash,address nftContract,uint256 nftTokenId,uint256 nonce,uint256 deadline)"
     );
 
+    /// @inheritdoc IProvenanceGateway
+    bytes32 public constant ASSIGN_NFT_TYPEHASH = keccak256(
+        "AssignNft(uint256 provenanceClaimId,address nftContract,uint256 nftTokenId,uint256 nonce,uint256 deadline)"
+    );
+
     /* solhint-enable gas-small-strings */
 
     // =============================================================
@@ -144,6 +149,53 @@ contract ProvenanceGateway is IProvenanceGateway, Withdrawable, EIP712, Nonces {
     }
 
     // =============================================================
+    //                          ASSIGNING NFTs
+    // =============================================================
+
+    /// @inheritdoc IProvenanceGateway
+    function assignNft(uint256 provenanceClaimId, address nftContract, uint256 nftTokenId)
+        external
+        override
+        whenNotPaused
+    {
+        _validateAssignNft({
+            provenanceClaimId: provenanceClaimId,
+            assigner: msg.sender,
+            nftContract: nftContract,
+            nftTokenId: nftTokenId,
+            withSignature: false
+        });
+
+        PROVENANCE_REGISTRY.unsafeAssignNft(provenanceClaimId, nftContract, nftTokenId);
+    }
+
+    function assignNftFor(
+        uint256 provenanceClaimId,
+        address nftContract,
+        uint256 nftTokenId,
+        uint256 deadline,
+        bytes calldata sig
+    ) external override whenNotPaused {
+        _validateAssignNft({
+            provenanceClaimId: provenanceClaimId,
+            assigner: msg.sender,
+            nftContract: nftContract,
+            nftTokenId: nftTokenId,
+            withSignature: true
+        });
+
+        _verifyAssignNftSig({
+            provenanceClaimId: provenanceClaimId,
+            nftContract: nftContract,
+            nftTokenId: nftTokenId,
+            deadline: deadline,
+            sig: sig
+        });
+
+        PROVENANCE_REGISTRY.unsafeAssignNft(provenanceClaimId, nftContract, nftTokenId);
+    }
+
+    // =============================================================
     //                          ONLY OWNER
     // =============================================================
 
@@ -194,6 +246,53 @@ contract ProvenanceGateway is IProvenanceGateway, Withdrawable, EIP712, Nonces {
         registrarId = idRegistry.idOf(registrar);
         if (registrarId == 0) revert RegistrarDoesNotExist();
 
+        // Check that the originator has not already registered this contentHash previously.
+        if (PROVENANCE_REGISTRY.provenanceClaimIdOfOriginatorAndHash(originatorId, contentHash) > 0) {
+            revert ContentHashAlreadyRegistered();
+        }
+
+        // If an NFT token ID was provided, check that the NFT contract is also provided
+        if (nftContract == address(0) && nftTokenId > 0) revert NftContractRequired();
+
+        // If the NFT is provided:
+        if (nftContract != address(0)) {
+            // Check that the NFT exists and is owned by the originator
+            if (idRegistry.idOf(IERC721(nftContract).ownerOf(nftTokenId)) != originatorId) {
+                revert NftNotOwnedByOriginator();
+            }
+
+            // Check that the NFT token has not already been used
+            if (PROVENANCE_REGISTRY.provenanceClaimIdOfNftToken(nftContract, nftTokenId) > 0) {
+                revert NftTokenAlreadyUsed();
+            }
+        }
+
+        // Check that the registrar has permission to register provenance on behalf of the originator,
+        // either with an EIP712 signature (that we verify elsewhere) or through the IdRegistry delegation.
+        if (!withSignature && !idRegistry.canAct(originatorId, registrar, address(this), "registerProvenance")) {
+            revert Unauthorized();
+        }
+    }
+
+    function _validateAssignNft(
+        uint256 provenanceClaimId,
+        address assigner,
+        address nftContract,
+        uint256 nftTokenId,
+        bool withSignature
+    ) internal view {
+        // Check that the provenance claim exists
+        if (provenanceClaimId > PROVENANCE_REGISTRY.idCounter()) revert ProvenanceClaimDoesNotExist();
+        uint256 originatorId = PROVENANCE_REGISTRY.provenanceClaim(provenanceClaimId).originatorId;
+
+        // Check that the provenance claim does not already have an NFT assigned
+        if (PROVENANCE_REGISTRY.provenanceClaim(provenanceClaimId).nftContract != address(0)) {
+            revert NftAlreadyAssigned();
+        }
+
+        // NFT contract is required data for assigning an NFT
+        if (nftContract == address(0)) revert NftContractRequired();
+
         // Check that the NFT exists and is owned by the originator
         if (idRegistry.idOf(IERC721(nftContract).ownerOf(nftTokenId)) != originatorId) {
             revert NftNotOwnedByOriginator();
@@ -202,16 +301,9 @@ contract ProvenanceGateway is IProvenanceGateway, Withdrawable, EIP712, Nonces {
         // Check that the NFT token has not already been used
         if (PROVENANCE_REGISTRY.provenanceClaimIdOfNftToken(nftContract, nftTokenId) > 0) revert NftTokenAlreadyUsed();
 
-        // Check that the originator has not already registered this contentHash previously.
-        if (PROVENANCE_REGISTRY.provenanceClaimIdOfOriginatorAndHash(originatorId, contentHash) > 0) {
-            revert ContentHashAlreadyRegistered();
-        }
-
-        // Check that the registrar has permission to register provenance on behalf of the originator.
-        //
-        // If there is a signature, the registrar must have permission to act on behalf of the originator for that specific ProvenanceClaim.
-        // Otherwise, we need to check the IdRegistry delegation to see if the registrar has been delegated.
-        if (!withSignature && !idRegistry.canAct(originatorId, registrar, address(this), "registerProvenance")) {
+        // Check that the assigner has permission to assign an NFT to a ProvenanceClaim on behalf of the originator,
+        // either with an EIP712 signature (that we verify elsewhere) or through the IdRegistry delegation.
+        if (!withSignature && !idRegistry.canAct(originatorId, assigner, address(this), "assignNft")) {
             revert Unauthorized();
         }
     }
@@ -254,6 +346,50 @@ contract ProvenanceGateway is IProvenanceGateway, Withdrawable, EIP712, Nonces {
             keccak256(
                 abi.encode(
                     REGISTER_TYPEHASH, originatorId, contentHash, nftContract, nftTokenId, _useNonce(operator), deadline
+                )
+            )
+        );
+
+        if (!SignatureCheckerLib.isValidSignatureNowCalldata(operator, operatorDigest, sig)) {
+            revert InvalidSignature();
+        }
+    }
+
+    /// @dev Verify the EIP712 signature for a assignNftFor transaction.
+    ///
+    /// NOTE: This follows a slightly different pattern than other _verifyXSig functions,
+    ///       because this signature can be valid from either the custody OR operator wallet.
+    function _verifyAssignNftSig(
+        uint256 provenanceClaimId,
+        address nftContract,
+        uint256 nftTokenId,
+        uint256 deadline,
+        bytes calldata sig
+    ) internal {
+        if (block.timestamp > deadline) revert SignatureExpired();
+
+        uint256 originatorId = PROVENANCE_REGISTRY.provenanceClaim(provenanceClaimId).originatorId;
+
+        address custody = idRegistry.custodyOf(originatorId);
+        bytes32 custodyDigest = _hashTypedData(
+            keccak256(
+                abi.encode(
+                    ASSIGN_NFT_TYPEHASH, provenanceClaimId, nftContract, nftTokenId, _useNonce(custody), deadline
+                )
+            )
+        );
+
+        bool isValid = SignatureCheckerLib.isValidSignatureNowCalldata(custody, custodyDigest, sig);
+        if (isValid) return;
+
+        // Get the operator address if it exists - if it's unset (address(0)), then there's no second digest to check.
+        address operator = idRegistry.operatorOf(originatorId);
+        if (operator == address(0)) revert InvalidSignature();
+
+        bytes32 operatorDigest = _hashTypedData(
+            keccak256(
+                abi.encode(
+                    ASSIGN_NFT_TYPEHASH, provenanceClaimId, nftContract, nftTokenId, _useNonce(operator), deadline
                 )
             )
         );
