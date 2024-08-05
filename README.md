@@ -31,7 +31,7 @@ This repository contains all the contracts deployed and used by the Royal Protoc
 In addition to the "core" contracts, there are some extra contracts included in this repo that may be useful for service providers or other entities operating within the protocol:
 
 6. **[RecoveryProxy](./src/extra/RecoveryProxy.sol)** - A smart contract that can be set as the `recovery` address for an account. Intended to be used by entities offering "Recovery-as-a-Service".
-7. **[ProvenanceToken](./src/extra/ProvenanceToken.sol)** - A simple ERC721 NFT contract. Each ProvenanceClaim requires a corresponding NFT token. This contract specifically was designed to be used with the ProvenanceRegistrar contract.
+7. **[ProvenanceToken](./src/extra/ProvenanceToken.sol)** - A simple ERC721 NFT contract. Each ProvenanceClaim can optionally have a corresponding NFT token. This contract specifically was designed to be used with the ProvenanceRegistrar contract.
 8. **[ProvenanceRegistrar](./src/extra/ProvenanceRegistrar.sol)** - A smart contract that can register provenance on behalf of other users. For that to work, this contract's address needs to be registered as the `operator` address of some protocol account, and delegations from users need to be set to this smart contract address on [delegate.xyz](https://delegate.xyz/).
 
 ## Deployments
