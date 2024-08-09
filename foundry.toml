@@ -20,3 +20,7 @@ via_ir=true
 # See: https://github.com/foundry-rs/foundry/issues/6402#issuecomment-2074741336
 # See: https://github.com/foundry-rs/foundry/pull/6656
 always_use_create_2_factory = true
+
+[doc]
+# The path to the directory where the documentation will be generated.
+out = "foundry_docs"
