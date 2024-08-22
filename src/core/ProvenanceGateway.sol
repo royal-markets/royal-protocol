@@ -26,7 +26,7 @@ contract ProvenanceGateway is IProvenanceGateway, Withdrawable, EIP712, Nonces {
     /* solhint-disable gas-small-strings */
 
     /// @inheritdoc IProvenanceGateway
-    string public constant VERSION = "2024-07-29";
+    string public constant VERSION = "2024-08-22";
 
     /// @inheritdoc IProvenanceGateway
     bytes32 public constant REGISTER_TYPEHASH = keccak256(
@@ -226,7 +226,7 @@ contract ProvenanceGateway is IProvenanceGateway, Withdrawable, EIP712, Nonces {
      *
      * - The originator must have a registered ID.
      * - The registrar must have a registered ID.
-     * - The NFT must exist and be owned by the originator (held by the custody or operator address).
+     * - The NFT must exist and be owned by the originator (held by the custody address).
      * - The NFT token must not already be associated with an existing ProvenanceClaim.
      * - The originator must not have already registered this contentHash.
      * - The registrar must have permission to register provenance on behalf of the originator.
@@ -313,9 +313,6 @@ contract ProvenanceGateway is IProvenanceGateway, Withdrawable, EIP712, Nonces {
     // =============================================================
 
     /// @dev Verify the EIP712 signature for a registerFor transaction.
-    ///
-    /// NOTE: This follows a slightly different pattern than other _verifyXSig functions,
-    ///       because this signature can be valid from either the custody OR operator wallet.
     function _verifyRegisterSig(
         uint256 originatorId,
         bytes32 contentHash,
@@ -336,29 +333,10 @@ contract ProvenanceGateway is IProvenanceGateway, Withdrawable, EIP712, Nonces {
         );
 
         bool isValid = SignatureCheckerLib.isValidSignatureNowCalldata(custody, custodyDigest, sig);
-        if (isValid) return;
-
-        // Get the operator address if it exists - if it's unset (address(0)), then there's no second digest to check.
-        address operator = idRegistry.operatorOf(originatorId);
-        if (operator == address(0)) revert InvalidSignature();
-
-        bytes32 operatorDigest = _hashTypedData(
-            keccak256(
-                abi.encode(
-                    REGISTER_TYPEHASH, originatorId, contentHash, nftContract, nftTokenId, _useNonce(operator), deadline
-                )
-            )
-        );
-
-        if (!SignatureCheckerLib.isValidSignatureNowCalldata(operator, operatorDigest, sig)) {
-            revert InvalidSignature();
-        }
+        if (!isValid) revert InvalidSignature();
     }
 
     /// @dev Verify the EIP712 signature for a assignNftFor transaction.
-    ///
-    /// NOTE: This follows a slightly different pattern than other _verifyXSig functions,
-    ///       because this signature can be valid from either the custody OR operator wallet.
     function _verifyAssignNftSig(
         uint256 provenanceClaimId,
         address nftContract,
@@ -380,22 +358,6 @@ contract ProvenanceGateway is IProvenanceGateway, Withdrawable, EIP712, Nonces {
         );
 
         bool isValid = SignatureCheckerLib.isValidSignatureNowCalldata(custody, custodyDigest, sig);
-        if (isValid) return;
-
-        // Get the operator address if it exists - if it's unset (address(0)), then there's no second digest to check.
-        address operator = idRegistry.operatorOf(originatorId);
-        if (operator == address(0)) revert InvalidSignature();
-
-        bytes32 operatorDigest = _hashTypedData(
-            keccak256(
-                abi.encode(
-                    ASSIGN_NFT_TYPEHASH, provenanceClaimId, nftContract, nftTokenId, _useNonce(operator), deadline
-                )
-            )
-        );
-
-        if (!SignatureCheckerLib.isValidSignatureNowCalldata(operator, operatorDigest, sig)) {
-            revert InvalidSignature();
-        }
+        if (!isValid) revert InvalidSignature();
     }
 }

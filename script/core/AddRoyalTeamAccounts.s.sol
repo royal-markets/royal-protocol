@@ -38,8 +38,8 @@ contract AddRoyalTeamAccounts is Script {
 
         // 15 Royal team accounts as of 2024-07-29
         // + 1 more for friend of the team
-        IIdRegistry.BulkRegisterWithOperatorAndDefaultRecoveryData[] memory data =
-            new IIdRegistry.BulkRegisterWithOperatorAndDefaultRecoveryData[](16);
+        IIdRegistry.BulkRegisterWithDefaultRecoveryData[] memory data =
+            new IIdRegistry.BulkRegisterWithDefaultRecoveryData[](16);
 
         string memory rawData = vm.readFile(CSV_FILE);
         string[] memory lines = LibString.split(rawData, "\r\n");
@@ -51,21 +51,12 @@ contract AddRoyalTeamAccounts is Script {
             string[] memory parts = LibString.split(line, ",");
             require(parts.length == 5, "Invalid line format");
 
-            // id, person, username, custody, operator (optional)
+            // id, person, username, custody
             console.log(string.concat("id: ", parts[0], ", Person: ", parts[1]));
-            console.log(string.concat("username: ", parts[2], ", custody: ", parts[3], ", operator: ", parts[4]));
+            console.log(string.concat("username: ", parts[2], ", custody: ", parts[3]));
 
-            address operator = address(0);
-            if (bytes(parts[4]).length > 0) {
-                operator = vm.parseAddress(parts[4]);
-            }
-
-            IIdRegistry.BulkRegisterWithOperatorAndDefaultRecoveryData memory entry = IIdRegistry
-                .BulkRegisterWithOperatorAndDefaultRecoveryData({
-                username: parts[2],
-                custody: vm.parseAddress(parts[3]),
-                operator: operator
-            });
+            IIdRegistry.BulkRegisterWithDefaultRecoveryData memory entry = IIdRegistry
+                .BulkRegisterWithDefaultRecoveryData({username: parts[2], custody: vm.parseAddress(parts[3])});
 
             data[i - 1] = entry;
         }
@@ -77,7 +68,7 @@ contract AddRoyalTeamAccounts is Script {
         ID_REGISTRY.migrate();
 
         // Actually run the migration
-        ID_REGISTRY.bulkRegisterIdsWithOperatorAndDefaultRecovery(data, ROYAL_RECOVERY);
+        ID_REGISTRY.bulkRegisterIdsWithDefaultRecovery(data, ROYAL_RECOVERY);
 
         // Update the IdRegistry IdCounter.
         ID_REGISTRY.setIdCounter(20);

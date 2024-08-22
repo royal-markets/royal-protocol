@@ -17,6 +17,7 @@ contract DeployProvenanceSystem is Script {
     bytes32 provenanceGatewaySalt = 0x00000000000000000000000000000000000000007cecb2788cc4000014f0b433;
 
     address public constant OWNER = 0x62Bd6bD77403268E387a8c7e09aF5D3127186be8;
+    address public constant ID_REGISTRY_MIGRATOR = 0xE5673eD07d596E558D280DACdaE346FAF9c9B1A7;
 
     IdRegistry public constant ID_REGISTRY = IdRegistry(0x00000000F74144b0dF049137A0F9416a920F2514);
 
@@ -33,7 +34,8 @@ contract DeployProvenanceSystem is Script {
         vm.startBroadcast();
 
         // Deploy Provenance contracts
-        ProvenanceRegistry provenanceRegistry = new ProvenanceRegistry{salt: provenanceRegistrySalt}(OWNER);
+        ProvenanceRegistry provenanceRegistry =
+            new ProvenanceRegistry{salt: provenanceRegistrySalt}(ID_REGISTRY_MIGRATOR, OWNER);
         console.log("ProvenanceRegistry address: %s", address(provenanceRegistry));
 
         ProvenanceGateway provenanceGateway =

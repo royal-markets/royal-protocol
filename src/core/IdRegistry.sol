@@ -18,8 +18,8 @@ import {LibString} from "solady/utils/LibString.sol";
  *
  * @notice The core User registry for the RoyalProtocol. Identities need to be registered here to act on the protocol.
  *
- *         Holds all the necessary information for a user, including custody, username, operator, and recovery addresses.
- *         Also includes the logic for transferring custody, recovering custody, and changing operator or recovery addresses.
+ *         Holds all the necessary information for a user, including the custody address, the username, and the recovery address.
+ *         Also includes the logic for transferring custody, recovering custody, and changing the recovery address.
  */
 contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
     // =============================================================
@@ -38,20 +38,15 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
     /* solhint-enable const-name-snakecase */
 
     /// @inheritdoc IIdRegistry
-    string public constant VERSION = "2024-07-29";
+    string public constant VERSION = "2024-08-22";
 
     /// @inheritdoc IIdRegistry
     bytes32 public constant TRANSFER_TYPEHASH =
         keccak256("Transfer(uint256 id,address to,uint256 nonce,uint256 deadline)");
 
     /// @inheritdoc IIdRegistry
-    bytes32 public constant TRANSFER_AND_CHANGE_OPERATOR_AND_RECOVERY_TYPEHASH = keccak256(
-        "TransferAndChangeOperatorAndRecovery(uint256 id,address to,address newOperator,address newRecovery,uint256 nonce,uint256 deadline)"
-    );
-
-    /// @inheritdoc IIdRegistry
-    bytes32 public constant CHANGE_OPERATOR_TYPEHASH =
-        keccak256("ChangeOperator(uint256 id,address newOperator,uint256 nonce,uint256 deadline)");
+    bytes32 public constant RECOVER_TYPEHASH =
+        keccak256("Recover(uint256 id,address to,uint256 nonce,uint256 deadline)");
 
     /// @inheritdoc IIdRegistry
     bytes32 public constant CHANGE_RECOVERY_TYPEHASH =
@@ -96,9 +91,6 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
 
     /// @inheritdoc IIdRegistry
     mapping(bytes32 usernameHash => uint256 id) public idOfUsernameHash;
-
-    /// @inheritdoc IIdRegistry
-    mapping(uint256 id => address operator) public operatorOf;
 
     /// @inheritdoc IIdRegistry
     mapping(uint256 id => address recovery) public recoveryOf;
@@ -153,15 +145,15 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
     ///
     /// @dev Includes `whenNotPaused` because the IdRegistry is paused on deploy, and we may want to run a migration before unpausing.
     ///      Technically you could handle this by just pausing the IdGateway, but this is more explicit / less error-prone.
-    function register(address custody, string calldata username, address operator, address recovery)
+    function register(address custody, string calldata username, address recovery)
         external
         override
         onlyIdGateway
         whenNotPaused
         returns (uint256 id)
     {
-        _validateRegister(custody, username, operator);
-        id = _unsafeRegister({custody: custody, username: username, operator: operator, recovery: recovery});
+        _validateRegister(custody, username);
+        id = _unsafeRegister({custody: custody, username: username, recovery: recovery});
     }
 
     /**
@@ -169,10 +161,8 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
      *
      * - The custody address must not already have a registered ID.
      * - The username is valid according to the UsernameGateway.
-     * - The operator address must not already have a registered ID.
-     * - The operator address must not be the same as the custody address.
      */
-    function _validateRegister(address custody, string calldata username, address operator) internal view {
+    function _validateRegister(address custody, string calldata username) internal view {
         if (idOf[custody] != 0) revert CustodyAlreadyRegistered();
 
         // We do validate registers inside a loop in bulk migrations,
@@ -185,22 +175,17 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
         // slither-disable-next-line calls-loop
         IUsernameGateway(usernameGateway).checkUsername(username);
         // slither-disable-end unused-return
-
-        // The operator cannot be the same as the custody address,
-        // due to the logic in handling transfers and changeOperator().
-        if (idOf[operator] != 0) revert OperatorAlreadyRegistered();
-        if (operator == custody) revert OperatorCannotBeCustody();
     }
 
     /**
      * @dev Registers a new ID.
      *
      * Sets up the custody address and username of a new ID.
-     * If the operator and/or recovery addresses are provided, they are also set up.
+     * If the recovery address is provided, it is also set up.
      *
      * Emits a Registered event.
      */
-    function _unsafeRegister(address custody, string calldata username, address operator, address recovery)
+    function _unsafeRegister(address custody, string calldata username, address recovery)
         internal
         returns (uint256 id)
     {
@@ -220,16 +205,10 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
         string memory lowercaseUsername = LibString.lower(username);
         idOfUsernameHash[keccak256(bytes(lowercaseUsername))] = id;
 
-        // Only set operator if it's not the zero address, because we dont want idOf[address(0)] to be set.
-        if (operator != address(0)) {
-            idOf[operator] = id;
-            operatorOf[id] = operator;
-        }
-
         // Set up recovery
         recoveryOf[id] = recovery;
 
-        emit Registered({id: id, custody: custody, username: username, operator: operator, recovery: recovery});
+        emit Registered({id: id, custody: custody, username: username, recovery: recovery});
     }
 
     // =============================================================
@@ -265,72 +244,34 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
     }
 
     /// @inheritdoc IIdRegistry
-    function transferAndChangeOperatorAndRecovery(
-        address to,
-        address newOperator,
-        address newRecovery,
-        uint256 deadline,
-        bytes calldata sig
-    ) external override {
+    function transferAndClearRecovery(address to, uint256 deadline, bytes calldata sig) external override {
         uint256 id = idOf[msg.sender];
         if (custodyOf[id] != msg.sender) revert OnlyCustody();
 
         _validateTransfer(to);
-        _validateChangeOperator(newOperator);
-
-        _verifyTransferAndChangeRecoverySig({
-            id: id,
-            to: to,
-            newOperator: newOperator,
-            newRecovery: newRecovery,
-            deadline: deadline,
-            signer: to,
-            sig: sig
-        });
+        _verifyTransferSig({id: id, to: to, deadline: deadline, signer: to, sig: sig});
 
         _unsafeTransfer(id, to);
-        _unsafeChangeOperator(id, newOperator);
-        _unsafeChangeRecovery(id, newRecovery);
+        _unsafeChangeRecovery(id, address(0));
     }
 
     /// @inheritdoc IIdRegistry
-    function transferAndChangeOperatorAndRecoveryFor(
+    function transferAndClearRecoveryFor(
         uint256 id,
         address to,
-        address newOperator,
-        address newRecovery,
         uint256 fromDeadline,
         bytes calldata fromSig,
         uint256 toDeadline,
         bytes calldata toSig
     ) external override {
         _validateTransfer(to);
-        _validateChangeOperator(newOperator);
 
         address from = custodyOf[id];
-        _verifyTransferAndChangeRecoverySig({
-            id: id,
-            to: to,
-            newOperator: newOperator,
-            newRecovery: newRecovery,
-            deadline: fromDeadline,
-            signer: from,
-            sig: fromSig
-        });
-
-        _verifyTransferAndChangeRecoverySig({
-            id: id,
-            to: to,
-            newOperator: newOperator,
-            newRecovery: newRecovery,
-            deadline: toDeadline,
-            signer: to,
-            sig: toSig
-        });
+        _verifyTransferSig({id: id, to: to, deadline: fromDeadline, signer: from, sig: fromSig});
+        _verifyTransferSig({id: id, to: to, deadline: toDeadline, signer: to, sig: toSig});
 
         _unsafeTransfer(id, to);
-        _unsafeChangeOperator(id, newOperator);
-        _unsafeChangeRecovery(id, newRecovery);
+        _unsafeChangeRecovery(id, address(0));
     }
 
     /// @dev Validate the transfer of an ID from one address to another.
@@ -405,50 +346,6 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
     }
 
     // =============================================================
-    //                        CHANGE OPERATOR
-    // =============================================================
-
-    /// @inheritdoc IIdRegistry
-    function changeOperator(address newOperator) external override {
-        uint256 id = idOf[msg.sender];
-        if (custodyOf[id] != msg.sender) revert OnlyCustody();
-
-        _validateChangeOperator(newOperator);
-        _unsafeChangeOperator(id, newOperator);
-    }
-
-    /// @inheritdoc IIdRegistry
-    function changeOperatorFor(uint256 id, address newOperator, uint256 deadline, bytes calldata sig)
-        external
-        override
-    {
-        _validateChangeOperator(newOperator);
-        _verifyChangeOperatorSig({id: id, newOperator: newOperator, deadline: deadline, sig: sig});
-        _unsafeChangeOperator(id, newOperator);
-    }
-
-    function _validateChangeOperator(address newOperator) internal view {
-        // The operator must not already have an ID.
-        if (idOf[newOperator] != 0) revert OperatorAlreadyRegistered();
-    }
-
-    /// @dev Change the operator address for an ID.
-    function _unsafeChangeOperator(uint256 id, address newOperator) internal whenNotPaused {
-        // Remove old operator
-        idOf[operatorOf[id]] = 0;
-
-        // Set new operator
-        operatorOf[id] = newOperator;
-
-        // Only set the idOf for the operator if its not address(0)
-        if (newOperator != address(0)) {
-            idOf[newOperator] = id;
-        }
-
-        emit OperatorAddressChanged(id, newOperator);
-    }
-
-    // =============================================================
     //                        RECOVERY LOGIC
     // =============================================================
 
@@ -483,7 +380,7 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
         if (recoveryOf[id] != msg.sender) revert OnlyRecovery();
 
         _validateTransfer(to);
-        _verifyTransferSig({id: id, to: to, deadline: deadline, signer: to, sig: sig});
+        _verifyRecoverSig({id: id, to: to, deadline: deadline, signer: to, sig: sig});
 
         _unsafeTransfer(id, to);
         emit Recovered(id, to);
@@ -501,8 +398,8 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
         _validateTransfer(to);
 
         address recovery = recoveryOf[id];
-        _verifyTransferSig({id: id, to: to, deadline: recoveryDeadline, signer: recovery, sig: recoverySig});
-        _verifyTransferSig({id: id, to: to, deadline: toDeadline, signer: to, sig: toSig});
+        _verifyRecoverSig({id: id, to: to, deadline: recoveryDeadline, signer: recovery, sig: recoverySig});
+        _verifyRecoverSig({id: id, to: to, deadline: toDeadline, signer: to, sig: toSig});
 
         _unsafeTransfer(id, to);
         emit Recovered(id, to);
@@ -571,21 +468,8 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
             for (uint256 i = 0; i < length; i++) {
                 BulkRegisterData calldata d = data[i];
 
-                _validateRegister(d.custody, d.username, address(0));
-                _unsafeRegister({custody: d.custody, username: d.username, operator: address(0), recovery: d.recovery});
-            }
-        }
-    }
-
-    /// @inheritdoc IIdRegistry
-    function bulkRegisterIdsWithOperator(BulkRegisterWithOperatorData[] calldata data) external override onlyMigrator {
-        uint256 length = data.length;
-        unchecked {
-            for (uint256 i = 0; i < length; i++) {
-                BulkRegisterWithOperatorData calldata d = data[i];
-
-                _validateRegister(d.custody, d.username, d.operator);
-                _unsafeRegister({custody: d.custody, username: d.username, operator: d.operator, recovery: d.recovery});
+                _validateRegister(d.custody, d.username);
+                _unsafeRegister({custody: d.custody, username: d.username, recovery: d.recovery});
             }
         }
     }
@@ -601,24 +485,8 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
             for (uint256 i = 0; i < length; i++) {
                 BulkRegisterWithDefaultRecoveryData calldata d = data[i];
 
-                _validateRegister(d.custody, d.username, address(0));
-                _unsafeRegister({custody: d.custody, username: d.username, operator: address(0), recovery: recovery});
-            }
-        }
-    }
-
-    /// @inheritdoc IIdRegistry
-    function bulkRegisterIdsWithOperatorAndDefaultRecovery(
-        BulkRegisterWithOperatorAndDefaultRecoveryData[] calldata data,
-        address recovery
-    ) external override onlyMigrator {
-        uint256 length = data.length;
-        unchecked {
-            for (uint256 i = 0; i < length; i++) {
-                BulkRegisterWithOperatorAndDefaultRecoveryData calldata d = data[i];
-
-                _validateRegister(d.custody, d.username, d.operator);
-                _unsafeRegister({custody: d.custody, username: d.username, operator: d.operator, recovery: recovery});
+                _validateRegister(d.custody, d.username);
+                _unsafeRegister({custody: d.custody, username: d.username, recovery: recovery});
             }
         }
     }
@@ -634,23 +502,31 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
     // =============================================================
 
     /// @inheritdoc IIdRegistry
-    function getUserById(uint256 id) external view override returns (User memory user) {
-        if (id > idCounter) revert HasNoId();
+    function getUserById(uint256 id) public view override returns (User memory user) {
+        if (id == 0 || id > idCounter) revert HasNoId();
 
-        return User({
-            id: id,
-            custody: custodyOf[id],
-            username: usernameOf[id],
-            operator: operatorOf[id],
-            recovery: recoveryOf[id]
-        });
+        return User({id: id, custody: custodyOf[id], username: usernameOf[id], recovery: recoveryOf[id]});
     }
 
     /// @inheritdoc IIdRegistry
-    function getIdByUsername(string calldata username) external view override returns (uint256 id) {
+    function getIdByUsername(string calldata username) public view override returns (uint256 id) {
         id = idOfUsernameHash[keccak256(bytes(LibString.lower(username)))];
 
         if (id == 0) revert HasNoId();
+    }
+
+    /// @inheritdoc IIdRegistry
+    function getUserByAddress(address wallet) external view override returns (User memory user) {
+        uint256 id = idOf[wallet];
+
+        return getUserById(id);
+    }
+
+    /// @inheritdoc IIdRegistry
+    function getUserByUsername(string calldata username) external view override returns (User memory user) {
+        uint256 id = getIdByUsername(username);
+
+        return getUserById(id);
     }
 
     // =============================================================
@@ -670,21 +546,14 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
         // (which could be different than the ID they are acting on behalf of).
         if (idOf[actor] == 0) return false;
 
-        // If the actor is the custody or operator address, they can act.
+        // If the actor is the custody address, they can act.
         address custody = custodyOf[id];
         if (actor == custody) return true;
 
-        address operator = operatorOf[id];
-        if (actor == operator) return true;
-
-        // If the actor is a delegate for the custody or operator, they can act.
-        bool custodyDelegation =
+        // If the actor is a delegate for the custody, they can act.
+        bool delegated =
             IDelegateRegistry(delegateRegistry).checkDelegateForContract(actor, custody, contractAddr, rights);
-        if (custodyDelegation) return true;
-
-        bool operatorDelegation =
-            IDelegateRegistry(delegateRegistry).checkDelegateForContract(actor, operator, contractAddr, rights);
-        if (operatorDelegation) return true;
+        if (delegated) return true;
 
         // If none of the above, the actor cannot act for that ID.
         return false;
@@ -695,7 +564,7 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
     // =============================================================
 
     /// @inheritdoc IIdRegistry
-    function verifyCustodySignature(uint256 id, bytes32 digest, bytes calldata sig)
+    function verifyIdSignature(uint256 id, bytes32 digest, bytes calldata sig)
         external
         view
         override
@@ -705,23 +574,16 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
         isValid = SignatureCheckerLib.isValidSignatureNowCalldata(custody, digest, sig);
     }
 
-    /// @inheritdoc IIdRegistry
-    function verifyIdSignature(uint256 id, bytes32 digest, bytes calldata sig)
-        external
-        view
-        override
-        returns (bool isValid)
-    {
-        address custody = custodyOf[id];
-        address operator = operatorOf[id];
-
-        isValid = SignatureCheckerLib.isValidSignatureNowCalldata(custody, digest, sig)
-            || SignatureCheckerLib.isValidSignatureNowCalldata(operator, digest, sig);
-    }
-
     // =============================================================
     //                       SIGNATURE HELPERS
     // =============================================================
+
+    /// @dev Verify the EIP712 signature for a recover transaction.
+    function _verifyRecoverSig(uint256 id, address to, uint256 deadline, address signer, bytes calldata sig) internal {
+        bytes32 digest = _hashTypedData(keccak256(abi.encode(RECOVER_TYPEHASH, id, to, _useNonce(signer), deadline)));
+
+        _verifySig(digest, signer, deadline, sig);
+    }
 
     /// @dev Verify the EIP712 signature for a transfer(For) transaction.
     function _verifyTransferSig(uint256 id, address to, uint256 deadline, address signer, bytes calldata sig)
@@ -730,45 +592,6 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
         bytes32 digest = _hashTypedData(keccak256(abi.encode(TRANSFER_TYPEHASH, id, to, _useNonce(signer), deadline)));
 
         _verifySig(digest, signer, deadline, sig);
-    }
-
-    /// @dev Verify the EIP712 signature for a transferAndChangeRecovery(For) transaction.
-    function _verifyTransferAndChangeRecoverySig(
-        uint256 id,
-        address to,
-        address newOperator,
-        address newRecovery,
-        uint256 deadline,
-        address signer,
-        bytes calldata sig
-    ) internal {
-        bytes32 digest = _hashTypedData(
-            keccak256(
-                abi.encode(
-                    TRANSFER_AND_CHANGE_OPERATOR_AND_RECOVERY_TYPEHASH,
-                    id,
-                    to,
-                    newOperator,
-                    newRecovery,
-                    _useNonce(signer),
-                    deadline
-                )
-            )
-        );
-
-        _verifySig(digest, signer, deadline, sig);
-    }
-
-    /// @dev Verify the EIP712 signature for a changeOperatorFor transaction.
-    function _verifyChangeOperatorSig(uint256 id, address newOperator, uint256 deadline, bytes calldata sig) internal {
-        // Needed to get nonce for the user and to verify signature.
-        address custody = custodyOf[id];
-
-        bytes32 digest = _hashTypedData(
-            keccak256(abi.encode(CHANGE_OPERATOR_TYPEHASH, id, newOperator, _useNonce(custody), deadline))
-        );
-
-        _verifySig(digest, custody, deadline, sig);
     }
 
     /// @dev Verify the EIP712 signature for a changeRecoveryFor transaction.

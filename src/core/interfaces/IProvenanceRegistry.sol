@@ -25,22 +25,26 @@ interface IProvenanceRegistry {
         uint256 blockNumber;
     }
 
+    // @dev Struct argument for admin bulk register function, for migrating data.
+    struct BulkRegisterData {
+        uint256 originatorId;
+        uint256 registrarId;
+        bytes32 contentHash;
+        address nftContract;
+        uint256 nftTokenId;
+    }
+
     // =============================================================
     //                           EVENTS
     // =============================================================
 
     /// @dev Emitted when a new ProvenanceClaim is registered.
     event ProvenanceRegistered(
-        uint256 id,
-        uint256 indexed originatorId,
-        uint256 indexed registrarId,
-        bytes32 indexed contentHash,
-        address nftContract,
-        uint256 nftTokenId
+        uint256 id, uint256 indexed originatorId, uint256 indexed registrarId, bytes32 indexed contentHash
     );
 
     /// @dev Emitted when an NFT is assigned to an existing ProvenanceClaim without an NFT.
-    event NftAssigned(uint256 indexed provenanceClaimId, address nftContract, uint256 nftTokenId);
+    event NftAssigned(uint256 indexed provenanceClaimId, address indexed nftContract, uint256 nftTokenId);
 
     /// @dev Emitted when the Owner sets the ProvenanceGateway to a new value.
     event ProvenanceGatewaySet(address oldProvenanceGateway, address newProvenanceGateway);
@@ -51,6 +55,9 @@ interface IProvenanceRegistry {
     // =============================================================
     //                          ERRORS
     // =============================================================
+
+    /// @dev Error emitted when a ProvenanceClaim is not found.
+    error ProvenanceClaimNotFound();
 
     /// @dev Revert when a non-IdGateway address attempts to call a gated function.
     error OnlyProvenanceGateway();
@@ -144,11 +151,30 @@ interface IProvenanceRegistry {
     function freezeProvenanceGateway() external;
 
     // =============================================================
-    //                          STRUCT GETTERS
+    //                          MIGRATION
+    // =============================================================
+
+    /// @notice Register a bunch of ProvenanceClaims as part of a migration.
+    function bulkRegisterProvenanceClaims(BulkRegisterData[] calldata data) external;
+
+    // =============================================================
+    //                          VIEW FUNCTIONS
     // =============================================================
 
     /// @notice The ProvenanceClaim for a given ID.
     ///
     /// Need a separate helper for this because public mappings just return a tuple rather than a struct.
     function provenanceClaim(uint256 id) external view returns (ProvenanceClaim memory);
+
+    /// @notice The ProvenanceClaim for a given originator ID and blake3 contentHash.
+    function provenanceClaimOfOriginatorAndHash(uint256 originatorId, bytes32 contentHash)
+        external
+        view
+        returns (ProvenanceClaim memory);
+
+    /// @notice The ProvenanceClaim for a given NFT token.
+    function provenanceClaimOfNftToken(address nftContract, uint256 nftTokenId)
+        external
+        view
+        returns (ProvenanceClaim memory);
 }

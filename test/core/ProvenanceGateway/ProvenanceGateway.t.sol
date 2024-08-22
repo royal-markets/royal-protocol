@@ -11,13 +11,10 @@ contract ProvenanceGatewayTest is ProvenanceTest {
     // =============================================================
 
     event ProvenanceRegistered(
-        uint256 id,
-        uint256 indexed originatorId,
-        uint256 indexed registrarId,
-        bytes32 indexed contentHash,
-        address nftContract,
-        uint256 nftTokenId
+        uint256 id, uint256 indexed originatorId, uint256 indexed registrarId, bytes32 indexed contentHash
     );
+
+    event NftAssigned(uint256 indexed provenanceClaimId, address indexed nftContract, uint256 nftTokenId);
 
     // =============================================================
     //                          ERRORS
@@ -34,7 +31,7 @@ contract ProvenanceGatewayTest is ProvenanceTest {
     // =============================================================
 
     function test_VERSION() public view {
-        assertEq(provenanceGateway.VERSION(), "2024-07-29");
+        assertEq(provenanceGateway.VERSION(), "2024-08-22");
     }
 
     function test_REGISTER_TYPEHASH() public view {
@@ -105,6 +102,38 @@ contract ProvenanceGatewayTest is ProvenanceTest {
     //                        register()
     // =============================================================
 
+    function testFuzz_registerWithoutNft(address custody, bytes32 contentHash, uint256 blockNumber) public {
+        // Bound inputs that need to be bound
+        vm.assume(custody != address(0));
+
+        // Register the custody as an originator, and mint the NFT to the custody.
+        uint256 originatorId = _register(custody, "username");
+
+        // Roll the block number forward to simulate the block number at the time of registration.
+        vm.roll(blockNumber);
+
+        // Assert preconditions.
+        address nftContract = address(0);
+        uint256 nftTokenId = 0;
+        uint256 expectedId = 1;
+        _assertRegisterPreconditions(expectedId, originatorId, contentHash, nftContract, nftTokenId);
+
+        // Register the provenance claim and check the event.
+        vm.expectEmit();
+        emit ProvenanceRegistered({
+            id: expectedId,
+            originatorId: originatorId,
+            registrarId: originatorId,
+            contentHash: contentHash
+        });
+
+        vm.prank(custody);
+        provenanceGateway.register(originatorId, contentHash, nftContract, nftTokenId);
+
+        // Assert postconditions.
+        _assertRegisterPostconditions(expectedId, originatorId, originatorId, contentHash, nftContract, nftTokenId);
+    }
+
     function testFuzz_register_WhenCustodyIsCallerAndNftHolder(
         address custody,
         bytes32 contentHash,
@@ -133,141 +162,13 @@ contract ProvenanceGatewayTest is ProvenanceTest {
             id: expectedId,
             originatorId: originatorId,
             registrarId: originatorId,
-            contentHash: contentHash,
-            nftContract: nftContract,
-            nftTokenId: nftTokenId
+            contentHash: contentHash
         });
+
+        vm.expectEmit();
+        emit NftAssigned({provenanceClaimId: expectedId, nftContract: nftContract, nftTokenId: nftTokenId});
 
         vm.prank(custody);
-        provenanceGateway.register(originatorId, contentHash, nftContract, nftTokenId);
-
-        // Assert postconditions.
-        _assertRegisterPostconditions(expectedId, originatorId, originatorId, contentHash, nftContract, nftTokenId);
-    }
-
-    function testFuzz_register_WhenCustodyIsCallerButOperatorIsNftHolder(
-        address custody,
-        address operator,
-        bytes32 contentHash,
-        bytes32 nftContractSalt,
-        uint256 nftTokenId,
-        uint256 blockNumber
-    ) public {
-        // Bound inputs that need to be bound
-        vm.assume(custody != address(0));
-        vm.assume(operator != address(0));
-        vm.assume(custody != operator);
-
-        // Register the custody as an originator, and mint the NFT to the custody.
-        uint256 originatorId = _register(custody, "username", operator);
-        address nftContract = _createMockERC721(nftContractSalt);
-        ERC721Mock(nftContract).mint(operator, nftTokenId);
-
-        // Roll the block number forward to simulate the block number at the time of registration.
-        vm.roll(blockNumber);
-
-        // Assert preconditions.
-        uint256 expectedId = 1;
-        _assertRegisterPreconditions(expectedId, originatorId, contentHash, nftContract, nftTokenId);
-
-        // Register the provenance claim and check the event.
-        vm.expectEmit();
-        emit ProvenanceRegistered({
-            id: expectedId,
-            originatorId: originatorId,
-            registrarId: originatorId,
-            contentHash: contentHash,
-            nftContract: nftContract,
-            nftTokenId: nftTokenId
-        });
-
-        vm.prank(custody);
-        provenanceGateway.register(originatorId, contentHash, nftContract, nftTokenId);
-
-        // Assert postconditions.
-        _assertRegisterPostconditions(expectedId, originatorId, originatorId, contentHash, nftContract, nftTokenId);
-    }
-
-    function testFuzz_register_WhenOperatorIsCallerAndNftHolder(
-        address custody,
-        address operator,
-        bytes32 contentHash,
-        bytes32 nftContractSalt,
-        uint256 nftTokenId,
-        uint256 blockNumber
-    ) public {
-        // Bound inputs that need to be bound
-        vm.assume(custody != address(0));
-        vm.assume(operator != address(0));
-        vm.assume(custody != operator);
-
-        // Register the custody as an originator, and mint the NFT to the custody.
-        uint256 originatorId = _register(custody, "username", operator);
-        address nftContract = _createMockERC721(nftContractSalt);
-        ERC721Mock(nftContract).mint(operator, nftTokenId);
-
-        // Roll the block number forward to simulate the block number at the time of registration.
-        vm.roll(blockNumber);
-
-        // Assert preconditions.
-        uint256 expectedId = 1;
-        _assertRegisterPreconditions(expectedId, originatorId, contentHash, nftContract, nftTokenId);
-
-        // Register the provenance claim and check the event.
-        vm.expectEmit();
-        emit ProvenanceRegistered({
-            id: expectedId,
-            originatorId: originatorId,
-            registrarId: originatorId,
-            contentHash: contentHash,
-            nftContract: nftContract,
-            nftTokenId: nftTokenId
-        });
-
-        vm.prank(operator);
-        provenanceGateway.register(originatorId, contentHash, nftContract, nftTokenId);
-
-        // Assert postconditions.
-        _assertRegisterPostconditions(expectedId, originatorId, originatorId, contentHash, nftContract, nftTokenId);
-    }
-
-    function testFuzz_register_WhenOperatorIsCallerButCustodyIsNftHolder(
-        address custody,
-        address operator,
-        bytes32 contentHash,
-        bytes32 nftContractSalt,
-        uint256 nftTokenId,
-        uint256 blockNumber
-    ) public {
-        // Bound inputs that need to be bound
-        vm.assume(custody != address(0));
-        vm.assume(operator != address(0));
-        vm.assume(custody != operator);
-
-        // Register the custody as an originator, and mint the NFT to the custody.
-        uint256 originatorId = _register(custody, "username", operator);
-        address nftContract = _createMockERC721(nftContractSalt);
-        ERC721Mock(nftContract).mint(custody, nftTokenId);
-
-        // Roll the block number forward to simulate the block number at the time of registration.
-        vm.roll(blockNumber);
-
-        // Assert preconditions.
-        uint256 expectedId = 1;
-        _assertRegisterPreconditions(expectedId, originatorId, contentHash, nftContract, nftTokenId);
-
-        // Register the provenance claim and check the event.
-        vm.expectEmit();
-        emit ProvenanceRegistered({
-            id: expectedId,
-            originatorId: originatorId,
-            registrarId: originatorId,
-            contentHash: contentHash,
-            nftContract: nftContract,
-            nftTokenId: nftTokenId
-        });
-
-        vm.prank(operator);
         provenanceGateway.register(originatorId, contentHash, nftContract, nftTokenId);
 
         // Assert postconditions.
@@ -308,59 +209,11 @@ contract ProvenanceGatewayTest is ProvenanceTest {
             id: expectedId,
             originatorId: originatorId,
             registrarId: registrarId,
-            contentHash: contentHash,
-            nftContract: nftContract,
-            nftTokenId: nftTokenId
+            contentHash: contentHash
         });
 
-        vm.prank(registrar);
-        provenanceGateway.register(originatorId, contentHash, nftContract, nftTokenId);
-
-        // Assert postconditions.
-        _assertRegisterPostconditions(expectedId, originatorId, registrarId, contentHash, nftContract, nftTokenId);
-    }
-
-    function testFuzz_register_WhenRegistrarIsDelegatedByOperator(
-        address custody,
-        address operator,
-        address registrar,
-        bytes32 contentHash,
-        bytes32 nftContractSalt,
-        uint256 nftTokenId,
-        uint256 blockNumber
-    ) public {
-        // Bound inputs that need to be bound
-        // NOTE: For some reason, delegate.xyz doesn't seem to like delegations from the ECRecover address (address(1)), so include that in the vm.assume() check.
-        vm.assume(custody != address(0));
-        vm.assume(operator != address(0) && operator != address(1) && operator != custody);
-        vm.assume(registrar != address(0) && custody != registrar && operator != registrar);
-
-        // Register the custody and registrar addresses, and mint the NFT to the custody.
-        uint256 originatorId = _register(custody, "username", operator);
-        uint256 registrarId = _register(registrar, "registrar");
-
-        address nftContract = _createMockERC721(nftContractSalt);
-        ERC721Mock(nftContract).mint(custody, nftTokenId);
-
-        _delegateProvenanceRegistration(operator, registrar);
-
-        // Roll the block number forward to simulate the block number at the time of registration.
-        vm.roll(blockNumber);
-
-        // Assert preconditions.
-        uint256 expectedId = 1;
-        _assertRegisterPreconditions(expectedId, originatorId, contentHash, nftContract, nftTokenId);
-
-        // Register the provenance claim and check the event.
         vm.expectEmit();
-        emit ProvenanceRegistered({
-            id: expectedId,
-            originatorId: originatorId,
-            registrarId: registrarId,
-            contentHash: contentHash,
-            nftContract: nftContract,
-            nftTokenId: nftTokenId
-        });
+        emit NftAssigned(expectedId, nftContract, nftTokenId);
 
         vm.prank(registrar);
         provenanceGateway.register(originatorId, contentHash, nftContract, nftTokenId);
@@ -405,10 +258,11 @@ contract ProvenanceGatewayTest is ProvenanceTest {
             id: expectedId1,
             originatorId: originatorId1,
             registrarId: originatorId1,
-            contentHash: contentHash,
-            nftContract: nftContract,
-            nftTokenId: nftTokenId1
+            contentHash: contentHash
         });
+
+        vm.expectEmit();
+        emit NftAssigned(expectedId1, nftContract, nftTokenId1);
 
         vm.prank(custody1);
         provenanceGateway.register(originatorId1, contentHash, nftContract, nftTokenId1);
@@ -420,10 +274,11 @@ contract ProvenanceGatewayTest is ProvenanceTest {
             id: expectedId2,
             originatorId: originatorId2,
             registrarId: originatorId2,
-            contentHash: contentHash,
-            nftContract: nftContract,
-            nftTokenId: nftTokenId2
+            contentHash: contentHash
         });
+
+        vm.expectEmit();
+        emit NftAssigned(expectedId2, nftContract, nftTokenId2);
 
         vm.prank(custody2);
         provenanceGateway.register(originatorId2, contentHash, nftContract, nftTokenId2);
@@ -628,6 +483,16 @@ contract ProvenanceGatewayTest is ProvenanceTest {
     // testFuzz_registerFor_RevertWhenInvalidSignature();
     // testFuzz_registerFor_RevertWhenUnauthorized();
 
+    // TODO:
+    // =============================================================
+    //                      assignNft()
+    // =============================================================
+
+    // TODO:
+    // =============================================================
+    //                      assignNftFor()
+    // =============================================================
+
     // =============================================================
     //                        ASSERTION HELPERS
     // =============================================================
@@ -662,9 +527,13 @@ contract ProvenanceGatewayTest is ProvenanceTest {
         uint256 nftTokenId
     ) internal view {
         assertEq(provenanceRegistry.idCounter(), id);
-
-        assertEq(provenanceRegistry.provenanceClaimIdOfNftToken(nftContract, nftTokenId), id);
         assertEq(provenanceRegistry.provenanceClaimIdOfOriginatorAndHash(originatorId, contentHash), id);
+
+        if (nftContract != address(0)) {
+            assertEq(provenanceRegistry.provenanceClaimIdOfNftToken(nftContract, nftTokenId), id);
+        } else {
+            assertEq(provenanceRegistry.provenanceClaimIdOfNftToken(nftContract, nftTokenId), 0);
+        }
 
         IProvenanceRegistry.ProvenanceClaim memory provenanceClaim = provenanceRegistry.provenanceClaim(id);
         assertEq(provenanceClaim.originatorId, originatorId);
