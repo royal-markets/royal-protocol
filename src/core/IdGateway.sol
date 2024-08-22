@@ -23,12 +23,11 @@ contract IdGateway is IIdGateway, Withdrawable, Signatures, EIP712, Nonces {
     /* solhint-disable gas-small-strings */
 
     /// @inheritdoc IIdGateway
-    string public constant VERSION = "2024-07-29";
+    string public constant VERSION = "2024-08-22";
 
     /// @inheritdoc IIdGateway
-    bytes32 public constant REGISTER_TYPEHASH = keccak256(
-        "Register(address custody,string username,address operator,address recovery,uint256 nonce,uint256 deadline)"
-    );
+    bytes32 public constant REGISTER_TYPEHASH =
+        keccak256("Register(address custody,string username,address recovery,uint256 nonce,uint256 deadline)");
 
     /* solhint-enable gas-small-strings */
 
@@ -69,35 +68,27 @@ contract IdGateway is IIdGateway, Withdrawable, Signatures, EIP712, Nonces {
     // =============================================================
 
     /// @inheritdoc IIdGateway
-    function register(string calldata username, address operator, address recovery)
+    function register(string calldata username, address recovery)
         external
         override
         whenNotPaused
         returns (uint256 id)
     {
-        id = ID_REGISTRY.register(msg.sender, username, operator, recovery);
+        id = ID_REGISTRY.register(msg.sender, username, recovery);
     }
 
     /// @inheritdoc IIdGateway
     function registerFor(
         address custody,
         string calldata username,
-        address operator,
         address recovery,
         uint256 deadline,
         bytes calldata sig
     ) external override whenNotPaused returns (uint256 id) {
         // Reverts if the signature is invalid
-        _verifyRegisterSig({
-            custody: custody,
-            username: username,
-            operator: operator,
-            recovery: recovery,
-            deadline: deadline,
-            sig: sig
-        });
+        _verifyRegisterSig({custody: custody, username: username, recovery: recovery, deadline: deadline, sig: sig});
 
-        id = ID_REGISTRY.register(custody, username, operator, recovery);
+        id = ID_REGISTRY.register(custody, username, recovery);
     }
 
     // =============================================================
@@ -108,7 +99,6 @@ contract IdGateway is IIdGateway, Withdrawable, Signatures, EIP712, Nonces {
     function _verifyRegisterSig(
         address custody,
         string calldata username,
-        address operator,
         address recovery,
         uint256 deadline,
         bytes calldata sig
@@ -116,13 +106,7 @@ contract IdGateway is IIdGateway, Withdrawable, Signatures, EIP712, Nonces {
         bytes32 digest = _hashTypedData(
             keccak256(
                 abi.encode(
-                    REGISTER_TYPEHASH,
-                    custody,
-                    keccak256(bytes(username)),
-                    operator,
-                    recovery,
-                    _useNonce(custody),
-                    deadline
+                    REGISTER_TYPEHASH, custody, keccak256(bytes(username)), recovery, _useNonce(custody), deadline
                 )
             )
         );

@@ -9,8 +9,6 @@ Users create accounts by registering with the `IdRegistry`. The Account system a
   * @param id       The user's ID.
   * @param custody  The user's custody address. Controls the ID.
   * @param username The user's username.
-  * @param operator The user's operator address (Optional).
-  *                   Can act on behalf of the ID (but not change User data).
   * @param recovery The user's recovery address (Optional).
   *                   Can recover the ID to another custody address.
   */
@@ -18,7 +16,6 @@ struct User {
     uint256 id;
     address custody;
     string username;
-    address operator; // Optional
     address recovery; // Optional
 }
 ```
@@ -62,9 +59,7 @@ Additionally, the protocol considers `delegate.xyz`'s v2 DelegateRegistry to det
 
 The IdRegistry lets any Ethereum address claim a unique Royal Protocol ID and a unique username for that account. An Ethereum address can only be associated with one Royal Protocol ID at a time - but each Royal Protocol ID can potentially map to two different addresses.
 
-Each Royal Protocol ID has a `custody` address that manages the user's account data - but can additionally have an optional `operator` address associated with it, to perform non-account related operations - like registering Provenance Claims.
-
-We like to think of these as a "cold wallet" (custody) and "hot wallet" (operator) for the account.
+Each Royal Protocol ID has a `custody` address that manages the user's account data.
 
 Additionally, accounts can set an optional `recovery` address to allow transfering that account to another custody wallet, in case the initial custody wallet is lost.
 
@@ -81,7 +76,7 @@ function getUserById(uint256 id) external view returns (User memory);
 /// @notice Gets the ID for a given username.
 function getIdByUsername(string calldata username) external view returns (uint256 id);
 
-/// @notice Maps each address (custody/operator) to its associated ID.
+/// @notice Maps each address (custody) to its associated ID.
 function idOf(address wallet) external view returns (uint256);
 
 /// @notice Maps each ID to its associated custody address.
@@ -89,9 +84,6 @@ function custodyOf(uint256 id) external view returns (address);
 
 /// @notice Maps each ID to its associated username.
 function usernameOf(uint256 id) external view returns (string memory);
-
-/// @notice Maps each ID to its associated operator address.
-function operatorOf(uint256 id) external view returns (address);
 
 /// @notice Maps each ID to its associated recovery address.
 function recoveryOf(uint256 id) external view returns (address);

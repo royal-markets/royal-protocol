@@ -28,7 +28,7 @@ contract UsernameGatewayTest is ProvenanceTest {
     // =============================================================
 
     function test_VERSION() public view {
-        assertEq(usernameGateway.VERSION(), "2024-07-29");
+        assertEq(usernameGateway.VERSION(), "2024-08-22");
     }
 
     function test_TRANSFER_USERNAME_TYPEHASH() public view {
@@ -242,43 +242,6 @@ contract UsernameGatewayTest is ProvenanceTest {
         bytes memory toSig = _signChangeUsername(toPk, to, toId, initialFromUsername, toDeadline);
         vm.expectRevert(EnforcedPause.selector);
         vm.prank(from);
-        usernameGateway.transferUsername(toId, newFromUsername, toDeadline, toSig);
-    }
-
-    function testFuzz_transferUsername_RevertWhenCalledByOperator(
-        address from,
-        address fromOperator,
-        uint256 toPk_,
-        uint8 initialFromUsernameLength_,
-        uint8 initialToUsernameLength_,
-        uint8 newFromUsernameLength_,
-        uint40 toDeadline_
-    ) public {
-        // Bound inputs that need to be bound.
-        vm.assume(from != address(0));
-        uint256 toPk = _boundPk(toPk_);
-        address to = vm.addr(toPk);
-        vm.assume(from != to);
-        vm.assume(fromOperator != address(0) && fromOperator != from && fromOperator != to);
-
-        uint256 initialFromUsernameLength = _boundUsernameLength(initialFromUsernameLength_);
-        string memory initialFromUsername = _getRandomValidUniqueUsername(initialFromUsernameLength);
-        uint256 initialToUsernameLength = _boundUsernameLength(initialToUsernameLength_);
-        string memory initialToUsername = _getRandomValidUniqueUsername(initialToUsernameLength);
-        uint256 newFromUsernameLength = _boundUsernameLength(newFromUsernameLength_);
-        string memory newFromUsername = _getRandomValidUniqueUsername(newFromUsernameLength);
-
-        uint256 toDeadline = _boundDeadline(toDeadline_);
-
-        // Register the from and to addresses with their initial usernames.
-        _register(from, initialFromUsername, fromOperator, address(0));
-        _register(to, initialToUsername);
-        uint256 toId = idRegistry.idOf(to);
-
-        // Attempt to transfer the username, but expect a revert.
-        bytes memory toSig = _signChangeUsername(toPk, to, toId, initialFromUsername, toDeadline);
-        vm.expectRevert(OnlyCustody.selector);
-        vm.prank(fromOperator);
         usernameGateway.transferUsername(toId, newFromUsername, toDeadline, toSig);
     }
 
@@ -780,7 +743,6 @@ contract UsernameGatewayTest is ProvenanceTest {
     }
 
     // Signature reverts
-    // TODO: Should I have a test that reverts when signed by operator specifically? But that's just an invalid signer...
 
     // TODO: testFuzz_transferUsername_RevertWhenFromDeadlineExpired
     // TODO: testFuzz_transferUsername_RevertWhenFromNonceInvalid
@@ -880,34 +842,6 @@ contract UsernameGatewayTest is ProvenanceTest {
         // Change the username.
         vm.expectRevert(EnforcedPause.selector);
         vm.prank(custody);
-        usernameGateway.changeUsername(newUsername);
-    }
-
-    function testFuzz_changeUsername_RevertWhenCalledByOperator(
-        address custody,
-        uint8 initialUsernameLength_,
-        uint8 newUsernameLength_,
-        address operator
-    ) public {
-        // Bound inputs that need to be bound.
-        vm.assume(custody != address(0));
-        vm.assume(operator != address(0) && operator != custody);
-
-        uint256 initialUsernameLength = _boundUsernameLength(initialUsernameLength_);
-        string memory initialUsername = _getRandomValidUniqueUsername(initialUsernameLength);
-        uint256 newUsernameLength = _boundUsernameLength(newUsernameLength_);
-        string memory newUsername = _getRandomValidUniqueUsername(newUsernameLength);
-
-        // Register the custody address with its initial username.
-        _register(custody, initialUsername, operator, address(0));
-        uint256 id = idRegistry.idOf(custody);
-
-        // Verify that the username was registered.
-        assertEq(idRegistry.usernameOf(id), initialUsername);
-
-        // Attempt to change the username.
-        vm.expectRevert(OnlyCustody.selector);
-        vm.prank(operator);
         usernameGateway.changeUsername(newUsername);
     }
 

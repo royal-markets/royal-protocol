@@ -12,8 +12,6 @@ interface IIdRegistry {
      * @param id The user's ID.
      * @param custody The user's custody address. Controls the ID.
      * @param username The user's username.
-     * @param operator The user's operator address (Optional).
-     *                 Can act on behalf of the ID (but not change User data).
      * @param recovery The user's recovery address (Optional).
      *                 Can recover the ID to another custody address.
      */
@@ -21,12 +19,11 @@ interface IIdRegistry {
         uint256 id;
         address custody;
         string username;
-        address operator; // Optional
         address recovery; // Optional
     }
 
     /// @dev Struct argument for admin bulk register function,
-    //       with operator == address(0) for each address, and user-specific recovery addresses.
+    //       with user-specific recovery addresses.
     struct BulkRegisterData {
         address custody;
         string username;
@@ -34,27 +31,10 @@ interface IIdRegistry {
     }
 
     /// @dev Struct argument for admin bulk register function,
-    ///      with user-specific operator addresses and recovery addresses.
-    struct BulkRegisterWithOperatorData {
-        address custody;
-        string username;
-        address operator;
-        address recovery;
-    }
-
-    /// @dev Struct argument for admin bulk register function,
-    ///      with operator == address(0) for each address, and a default recovery address.
+    ///      with a default recovery address.
     struct BulkRegisterWithDefaultRecoveryData {
         address custody;
         string username;
-    }
-
-    /// @dev Struct argument for admin bulk register function,
-    ///      with user-specific operator addresses, and a default recovery address.
-    struct BulkRegisterWithOperatorAndDefaultRecoveryData {
-        address custody;
-        string username;
-        address operator;
     }
 
     // =============================================================
@@ -62,9 +42,7 @@ interface IIdRegistry {
     // =============================================================
 
     /// @dev Emitted on successful registration of a new ID.
-    event Registered(
-        uint256 id, address indexed custody, string username, address indexed operator, address indexed recovery
-    );
+    event Registered(uint256 id, address indexed custody, string username, address indexed recovery);
 
     /// @dev Emitted on successful transfer of an ID to another address.
     ///
@@ -77,9 +55,6 @@ interface IIdRegistry {
 
     /// @dev Emitted on successful change of username.
     event UsernameChanged(uint256 indexed id, string newUsername);
-
-    /// @dev Emitted on successful change of operator address.
-    event OperatorAddressChanged(uint256 indexed id, address indexed newOperator);
 
     /// @dev Emitted on successful change of recovery address.
     event RecoveryAddressChanged(uint256 indexed id, address indexed newRecovery);
@@ -120,12 +95,6 @@ interface IIdRegistry {
 
     /// @dev Revert when the provided custody address has already been registered by another ID.
     error CustodyAlreadyRegistered();
-
-    /// @dev Revert when the provided operator address has already been registered by another ID.
-    error OperatorAlreadyRegistered();
-
-    /// @dev Revert when the `custody` and `operator` addresses provided in registration are the same.
-    error OperatorCannotBeCustody();
 
     /// @dev Revert when the relevant address is not the custody address of the ID.
     error OnlyCustody();
@@ -176,11 +145,8 @@ interface IIdRegistry {
     /// @notice The EIP712 typehash for Transfer signatures.
     function TRANSFER_TYPEHASH() external view returns (bytes32);
 
-    /// @notice The EIP712 typehash for TransferAndChangeRecovery signatures.
-    function TRANSFER_AND_CHANGE_OPERATOR_AND_RECOVERY_TYPEHASH() external view returns (bytes32);
-
-    /// @notice The EIP712 typehash for ChangeOperator signatures.
-    function CHANGE_OPERATOR_TYPEHASH() external view returns (bytes32);
+    /// @notice The EIP712 typehash for Recover signatures.
+    function RECOVER_TYPEHASH() external view returns (bytes32);
 
     /// @notice The EIP712 typehash for ChangeRecovery signatures.
     function CHANGE_RECOVERY_TYPEHASH() external view returns (bytes32);
@@ -216,7 +182,7 @@ interface IIdRegistry {
     /**
      * @notice The address of the DelegateRegistry contract. (updatable).
      *
-     * We use this contract for the `canAct() logic to check delegations against the custody and operator.
+     * We use this contract for the `canAct() logic to check delegations against the custody address of the ID.
      * It MUST implement the delegate.xyz v2 interface, (and by default, is the delegate.xyz v2 contract).
      *
      * It is updatable so that we can extend / swap the functionality of `canAct()` in the future if necessary.
@@ -229,7 +195,7 @@ interface IIdRegistry {
     /// @notice The last RoyalProtocol ID that was issued.
     function idCounter() external view returns (uint256);
 
-    /// @notice Maps each address (custody/operator) to its associated ID.
+    /// @notice Maps each custody address to its associated ID.
     function idOf(address wallet) external view returns (uint256);
 
     /// @notice Maps each ID to its associated custody address.
@@ -240,9 +206,6 @@ interface IIdRegistry {
 
     /// @notice Maps each (lowercased) username hash to its associated ID.
     function idOfUsernameHash(bytes32 usernameHash) external view returns (uint256);
-
-    /// @notice Maps each ID to its associated operator address.
-    function operatorOf(uint256 id) external view returns (address);
 
     /// @notice Maps each ID to its associated recovery address.
     function recoveryOf(uint256 id) external view returns (address);
@@ -256,12 +219,9 @@ interface IIdRegistry {
      *
      * @param custody The custody address for the ID. Controls the ID.
      * @param username The username for the ID.
-     * @param operator The operator address for the ID. Can potentially act on behalf of the ID (but not in the IdRegistry contract itself).
      * @param recovery The recovery address for the ID. Can recover the ID to another custody address.
      */
-    function register(address custody, string calldata username, address operator, address recovery)
-        external
-        returns (uint256 id);
+    function register(address custody, string calldata username, address recovery) external returns (uint256 id);
 
     // =============================================================
     //                          TRANSFERS
@@ -269,12 +229,12 @@ interface IIdRegistry {
 
     /// @notice Transfer the caller's ID to another address.
     ///
-    /// NOTE: This leaves the `recovery` and `operator` addresses unchanged.
+    /// NOTE: This leaves the `recovery` address unchanged.
     function transfer(address to, uint256 deadline, bytes calldata sig) external;
 
     /// @notice Transfer the provided ID to another address.
     ///
-    /// NOTE: This leaves the `recovery` and `operator` addresses unchanged.
+    /// NOTE: This leaves the `recovery` address unchanged.
     function transferFor(
         uint256 id,
         address to,
@@ -284,21 +244,13 @@ interface IIdRegistry {
         bytes calldata toSig
     ) external;
 
-    /// @notice Transfer the caller's ID to another address and change the recovery and operator addresses.
-    function transferAndChangeOperatorAndRecovery(
-        address to,
-        address newOperator,
-        address newRecovery,
-        uint256 deadline,
-        bytes calldata sig
-    ) external;
+    /// @notice Transfer the caller's ID to another address and clear the recovery address.
+    function transferAndClearRecovery(address to, uint256 deadline, bytes calldata sig) external;
 
-    /// @notice Transfer the provided ID to another address and change the recovery and operator addresses.
-    function transferAndChangeOperatorAndRecoveryFor(
+    /// @notice Transfer the provided ID to another address and clear the recovery address.
+    function transferAndClearRecoveryFor(
         uint256 id,
         address to,
-        address newOperator,
-        address newRecovery,
         uint256 fromDeadline,
         bytes calldata fromSig,
         uint256 toDeadline,
@@ -331,16 +283,6 @@ interface IIdRegistry {
      * @param newUsername The new username for the provided `id`.
      */
     function unsafeChangeUsername(uint256 id, string calldata newUsername) external;
-
-    // =============================================================
-    //                       CHANGE OPERATOR
-    // =============================================================
-
-    /// @notice Change the operator address for the caller's ID.
-    function changeOperator(address newOperator) external;
-
-    /// @notice Change the operator address for the provided ID.
-    function changeOperatorFor(uint256 id, address newOperator, uint256 deadline, bytes calldata sig) external;
 
     // =============================================================
     //                       RECOVERY LOGIC
@@ -403,18 +345,9 @@ interface IIdRegistry {
     /// @notice Register a bunch of IDs as part of a migration.
     function bulkRegisterIds(BulkRegisterData[] calldata data) external;
 
-    /// @notice Register a bunch of IDs with operators as part of a migration.
-    function bulkRegisterIdsWithOperator(BulkRegisterWithOperatorData[] calldata data) external;
-
     /// @notice Register a bunch of IDs with a default recovery address as part of a migration.
     function bulkRegisterIdsWithDefaultRecovery(BulkRegisterWithDefaultRecoveryData[] calldata data, address recovery)
         external;
-
-    /// @notice Register a bunch of IDs with operators and a default recovery address as part of a migration.
-    function bulkRegisterIdsWithOperatorAndDefaultRecovery(
-        BulkRegisterWithOperatorAndDefaultRecoveryData[] calldata data,
-        address recovery
-    ) external;
 
     /**
      * @notice Set the idCounter to a new value.
@@ -427,11 +360,17 @@ interface IIdRegistry {
     //                       VIEW FUNCTIONS
     // =============================================================
 
-    /// @notice Get the user data for the provided ID.
+    /// @notice Get the User data for the provided ID.
     function getUserById(uint256 id) external view returns (User memory);
 
     /// @notice Gets the ID for a given username.
     function getIdByUsername(string calldata username) external view returns (uint256 id);
+
+    /// @notice Gets the User data for the provided custody address.
+    function getUserByAddress(address wallet) external view returns (User memory);
+
+    /// @notice Gets the User data for a given username.
+    function getUserByUsername(string calldata username) external view returns (User memory);
 
     // =============================================================
     //                          CAN ACT
@@ -456,8 +395,5 @@ interface IIdRegistry {
     // =============================================================
 
     /// @notice Verifies a signature for a given ID is from the `custody` address.
-    function verifyCustodySignature(uint256 id, bytes32 digest, bytes calldata sig) external returns (bool isValid);
-
-    /// @notice Verifies a signature for a given ID is from the `custody` or `operator` address.
     function verifyIdSignature(uint256 id, bytes32 digest, bytes calldata sig) external returns (bool isValid);
 }

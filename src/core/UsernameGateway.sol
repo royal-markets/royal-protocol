@@ -25,7 +25,7 @@ contract UsernameGateway is IUsernameGateway, Withdrawable, Signatures, EIP712, 
     /* solhint-disable gas-small-strings */
 
     /// @inheritdoc IUsernameGateway
-    string public constant VERSION = "2024-07-29";
+    string public constant VERSION = "2024-08-22";
 
     /// @inheritdoc IUsernameGateway
     bytes32 public constant TRANSFER_USERNAME_TYPEHASH =

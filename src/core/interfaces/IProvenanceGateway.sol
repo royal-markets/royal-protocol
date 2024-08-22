@@ -9,20 +9,6 @@ interface IProvenanceGateway {
     //                           EVENTS
     // =============================================================
 
-    /// @dev Emitted when a new ProvenanceClaim is registered.
-    ////
-    /// NOTE: This event is not actually emitted by ProvenanceGateway,
-    ///       but because it is emitted when calling ProvenanceRegistry.register(),
-    ///       it is included here.
-    event ProvenanceRegistered(
-        uint256 id,
-        uint256 indexed originatorId,
-        uint256 indexed registrarId,
-        bytes32 indexed contentHash,
-        address nftContract,
-        uint256 nftTokenId
-    );
-
     /// @dev Emitted when the Owner sets the IdRegistry to a new value.
     event IdRegistrySet(address oldIdRegistry, address newIdRegistry);
 
@@ -146,7 +132,7 @@ interface IProvenanceGateway {
      * @param nftContract The NFT contract of the associated NFT of this ProvenanceClaim.
      * @param nftTokenId The token ID of the NFT associated with this ProvenanceClaim.
      * @param deadline The expiration timestamp for the signature.
-     * @param sig The EIP712 "Register" signature from the originator. (Signed by either custody or operator address).
+     * @param sig The EIP712 "Register" signature from the originator. (Signed by the custody address).
      *
      * @return id The registered ProvenanceClaim ID.
      */
@@ -196,7 +182,7 @@ interface IProvenanceGateway {
      * @param nftContract The NFT contract to associate with this ProvenanceClaim.
      * @param nftTokenId The token ID of the NFT to associate with this ProvenanceClaim.
      * @param deadline The expiration timestamp for the signature.
-     * @param sig The EIP712 "AssignNft" signature from the originator. (Signed by either custody or operator address).
+     * @param sig The EIP712 "AssignNft" signature from the originator. (Signed by the custody address).
      */
     function assignNftFor(
         uint256 provenanceClaimId,

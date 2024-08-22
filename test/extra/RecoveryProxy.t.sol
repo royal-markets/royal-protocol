@@ -36,7 +36,9 @@ contract RecoveryProxyTest is ProvenanceTest {
         recoveryProxy.addRecoverCaller(proxy);
 
         vm.startPrank(address(idGateway));
-        idRegistry.register(vm.addr(_fromPrivateKey), "username", address(0x12), proxy);
+
+        address custody = vm.addr(_fromPrivateKey);
+        idRegistry.register(custody, "username", proxy);
         vm.stopPrank();
     }
 
@@ -63,7 +65,7 @@ contract RecoveryProxyTest is ProvenanceTest {
             abi.encodePacked(
                 "\x19\x01",
                 domainSeparator,
-                keccak256(abi.encode(idRegistry.TRANSFER_TYPEHASH(), id, to, idRegistry.nonces(to), deadline))
+                keccak256(abi.encode(idRegistry.RECOVER_TYPEHASH(), id, to, idRegistry.nonces(to), deadline))
             )
         );
 

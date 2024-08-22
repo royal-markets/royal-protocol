@@ -52,6 +52,7 @@ abstract contract ProvenanceTest is Test {
     address public immutable ID_GATEWAY_OWNER;
     address public immutable USERNAME_GATEWAY_OWNER;
 
+    address public immutable PROVENANCE_REGISTRY_MIGRATOR;
     address public immutable PROVENANCE_REGISTRY_OWNER;
     address public immutable PROVENANCE_GATEWAY_OWNER;
 
@@ -79,8 +80,9 @@ abstract contract ProvenanceTest is Test {
         ID_GATEWAY_OWNER = vm.addr(0x03);
         USERNAME_GATEWAY_OWNER = vm.addr(0x04);
 
-        PROVENANCE_REGISTRY_OWNER = vm.addr(0x05);
-        PROVENANCE_GATEWAY_OWNER = vm.addr(0x06);
+        PROVENANCE_REGISTRY_MIGRATOR = vm.addr(0x05);
+        PROVENANCE_REGISTRY_OWNER = vm.addr(0x06);
+        PROVENANCE_GATEWAY_OWNER = vm.addr(0x07);
     }
 
     // =============================================================
@@ -99,11 +101,13 @@ abstract contract ProvenanceTest is Test {
         idRegistry.unpause();
         vm.stopPrank();
 
-        provenanceRegistry = new ProvenanceRegistry(PROVENANCE_REGISTRY_OWNER);
+        provenanceRegistry = new ProvenanceRegistry(PROVENANCE_REGISTRY_MIGRATOR, PROVENANCE_REGISTRY_OWNER);
         provenanceGateway = new ProvenanceGateway(provenanceRegistry, idRegistry, PROVENANCE_GATEWAY_OWNER);
 
-        vm.prank(PROVENANCE_REGISTRY_OWNER);
+        vm.startPrank(PROVENANCE_REGISTRY_OWNER);
         provenanceRegistry.setProvenanceGateway(address(provenanceGateway));
+        provenanceRegistry.unpause();
+        vm.stopPrank();
 
         // Set up DelegateRegistry for delegation tests,
         // and set bytecode to the expected delegate.xyz v2 address
@@ -197,27 +201,108 @@ abstract contract ProvenanceTest is Test {
     /// @dev Register just a username with the IdGateway.
     function _register(address custody, string memory username) internal returns (uint256 id) {
         vm.prank(custody);
-        id = idGateway.register(username, address(0), address(0));
+        id = idGateway.register(username, address(0));
     }
 
-    /// @dev Register a username and operator with the IdGateway.
-    function _register(address custody, string memory username, address operator) internal returns (uint256 id) {
-        vm.prank(custody);
-        id = idGateway.register(username, operator, address(0));
-    }
+    /// @dev Register a new account with a uesrname and recovery address.
+    function _register(address custody, string memory username, address recovery) internal returns (uint256 id) {
+        vm.startPrank(custody);
+        id = idGateway.register(username, recovery);
 
-    /// @dev Register a username, operator, and recovery address with the IdGateway.
-    function _register(address custody, string memory username, address operator, address recovery)
-        internal
-        returns (uint256 id)
-    {
-        vm.prank(custody);
-        id = idGateway.register(username, operator, recovery);
+        vm.stopPrank();
     }
 
     // =============================================================
     //                        PROVENANCE HELPERS
     // =============================================================
+
+    /// @dev Register the given accounts and the ProvenanceClaim.
+    function _registerProvenance(address originator, address registrar, bytes32 contentHash)
+        internal
+        returns (uint256 id)
+    {
+        uint256 originatorId = _register(originator, "originator");
+        uint256 registrarId = _register(registrar, "registrar");
+
+        if (registrar != originator) {
+            vm.prank(originator);
+            _DELEGATE_REGISTRY.delegateContract(registrar, address(provenanceGateway), "registerProvenance", true);
+        }
+
+        address nftContract = address(0);
+        uint256 tokenId = 0;
+
+        vm.prank(registrar);
+        id = provenanceGateway.register(originatorId, contentHash, nftContract, tokenId);
+    }
+
+    /// @dev Register the given accounts and the ProvenanceClaim, with NFT token.
+    function _registerProvenance(
+        address originator,
+        address registrar,
+        bytes32 contentHash,
+        address nftContract,
+        uint256 tokenId
+    ) internal returns (uint256 id) {
+        uint256 originatorId = _register(originator, "originator");
+        uint256 registrarId = _register(registrar, "registrar");
+
+        if (registrar != originator) {
+            vm.prank(originator);
+            _DELEGATE_REGISTRY.delegateContract(registrar, address(provenanceGateway), "registerProvenance", true);
+        }
+
+        ERC721Mock erc721 = new ERC721Mock();
+        vm.etch(nftContract, address(erc721).code);
+        erc721.mint(originator, tokenId);
+
+        vm.prank(registrar);
+        id = provenanceGateway.register(originatorId, contentHash, nftContract, tokenId);
+    }
+
+    /// @dev Register provenance with the given (already registered) account IDs.
+    function _registerProvenance(uint256 originatorId, uint256 registrarId, bytes32 contentHash)
+        internal
+        returns (uint256 id)
+    {
+        address originator = idRegistry.custodyOf(originatorId);
+        address registrar = idRegistry.custodyOf(registrarId);
+
+        if (originatorId != registrarId) {
+            vm.prank(originator);
+            _DELEGATE_REGISTRY.delegateContract(registrar, address(provenanceGateway), "registerProvenance", true);
+        }
+
+        address nftContract = address(0);
+        uint256 tokenId = 0;
+
+        vm.prank(registrar);
+        id = provenanceGateway.register(originatorId, contentHash, nftContract, tokenId);
+    }
+
+    /// @dev Register provenance with the given (already registered) account IDs, and NFT token.
+    function _registerProvenance(
+        uint256 originatorId,
+        uint256 registrarId,
+        bytes32 contentHash,
+        address nftContract,
+        uint256 tokenId
+    ) internal returns (uint256 id) {
+        address originator = idRegistry.custodyOf(originatorId);
+        address registrar = idRegistry.custodyOf(registrarId);
+
+        if (originatorId != registrarId) {
+            vm.prank(originator);
+            _DELEGATE_REGISTRY.delegateContract(registrar, address(provenanceGateway), "registerProvenance", true);
+        }
+
+        ERC721Mock erc721 = new ERC721Mock();
+        vm.etch(nftContract, address(erc721).code);
+        erc721.mint(originator, tokenId);
+
+        vm.prank(registrar);
+        id = provenanceGateway.register(originatorId, contentHash, nftContract, tokenId);
+    }
 
     function _createMockERC721(bytes32 salt) internal returns (address mockNftAddress) {
         ERC721Mock mockNft = new ERC721Mock{salt: salt}();

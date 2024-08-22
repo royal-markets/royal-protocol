@@ -11,7 +11,6 @@ contract IdRegistryTest is ProvenanceTest {
     // =============================================================
 
     event Transfer(address indexed from, address indexed to, uint256 indexed id);
-    event OperatorAddressChanged(uint256 indexed id, address indexed operator);
     event RecoveryAddressChanged(uint256 indexed id, address indexed recovery);
     event Recovered(uint256 indexed id, address indexed to);
 
@@ -30,8 +29,6 @@ contract IdRegistryTest is ProvenanceTest {
     error OnlyUsernameGateway();
 
     error CustodyAlreadyRegistered();
-    error OperatorAlreadyRegistered();
-    error OperatorCannotBeCustody();
 
     error OnlyCustody();
     error OnlyRecovery();
@@ -48,7 +45,7 @@ contract IdRegistryTest is ProvenanceTest {
     }
 
     function test_VERSION() public view {
-        assertEq(idRegistry.VERSION(), "2024-07-29");
+        assertEq(idRegistry.VERSION(), "2024-08-22");
     }
 
     function test_TRANSFER_TYPEHASH() public view {
@@ -57,19 +54,9 @@ contract IdRegistryTest is ProvenanceTest {
         );
     }
 
-    function test_TRANSFER_AND_CHANGE_OPERATOR_AND_RECOVERY_TYPEHASH() public view {
+    function test_RECOVER_TYPEHASH() public view {
         assertEq(
-            idRegistry.TRANSFER_AND_CHANGE_OPERATOR_AND_RECOVERY_TYPEHASH(),
-            keccak256(
-                "TransferAndChangeOperatorAndRecovery(uint256 id,address to,address newOperator,address newRecovery,uint256 nonce,uint256 deadline)"
-            )
-        );
-    }
-
-    function test_CHANGE_OPERATOR_TYPEHASH() public view {
-        assertEq(
-            idRegistry.CHANGE_OPERATOR_TYPEHASH(),
-            keccak256("ChangeOperator(uint256 id,address newOperator,uint256 nonce,uint256 deadline)")
+            idRegistry.RECOVER_TYPEHASH(), keccak256("Recover(uint256 id,address to,uint256 nonce,uint256 deadline)")
         );
     }
 
@@ -148,7 +135,6 @@ contract IdRegistryTest is ProvenanceTest {
         address caller,
         address custody,
         uint8 usernameLength_,
-        address operator,
         address recovery
     ) public {
         // Bound inputs that need to be bound.
@@ -159,38 +145,32 @@ contract IdRegistryTest is ProvenanceTest {
 
         vm.expectRevert(OnlyIdGateway.selector);
         vm.prank(caller);
-        idRegistry.register(custody, username, operator, recovery);
+        idRegistry.register(custody, username, recovery);
     }
 
     // =============================================================
     //                        transfer()
     // =============================================================
 
-    function testFuzz_transfer(
-        address from,
-        uint8 usernameLength_,
-        address operator,
-        address recovery,
-        uint256 toPk_,
-        uint40 deadline_
-    ) public {
+    function testFuzz_transfer(address from, uint8 usernameLength_, address recovery, uint256 toPk_, uint40 deadline_)
+        public
+    {
         // Bound inputs that need to be bound.
         vm.assume(from != address(0));
-        vm.assume(from != operator);
         uint256 usernameLength = _boundUsernameLength(usernameLength_);
         string memory username = _getRandomValidUniqueUsername(usernameLength);
 
         uint256 toPk = _boundPk(toPk_);
         address to = vm.addr(toPk);
-        vm.assume(to != from && to != operator);
+        vm.assume(to != from);
 
         uint256 deadline = _boundDeadline(deadline_);
 
         // Register the ID that we're going to transfer.
-        uint256 id = _register(from, username, operator, recovery);
+        uint256 id = _register(from, username, recovery);
 
         // Check preconditions.
-        _assertTransferPreconditions(id, from, to, username, operator, recovery);
+        _assertTransferPreconditions(id, from, to, username, recovery);
 
         // Get signature from `to` address authorizing receiving the transfer, and transfer the ID.
         bytes memory sig = _signTransfer(toPk, id, to, deadline);
@@ -201,34 +181,32 @@ contract IdRegistryTest is ProvenanceTest {
         idRegistry.transfer(to, deadline, sig);
 
         // Check that the ID was transferred.
-        _assertTransferPostconditions(id, from, to, username, operator, recovery);
+        _assertTransferPostconditions(id, from, to, username, recovery);
     }
 
     function testFuzz_transfer_RevertWhenIdRegistryPaused(
         address from,
         uint8 usernameLength_,
-        address operator,
         address recovery,
         uint256 toPk_,
         uint40 deadline_
     ) public {
         // Bound inputs that need to be bound.
         vm.assume(from != address(0));
-        vm.assume(from != operator);
         uint256 usernameLength = _boundUsernameLength(usernameLength_);
         string memory username = _getRandomValidUniqueUsername(usernameLength);
 
         uint256 toPk = _boundPk(toPk_);
         address to = vm.addr(toPk);
-        vm.assume(to != from && to != operator);
+        vm.assume(to != from);
 
         uint256 deadline = _boundDeadline(deadline_);
 
         // Register the ID that we're going to transfer.
-        uint256 id = _register(from, username, operator, recovery);
+        uint256 id = _register(from, username, recovery);
 
         // Check preconditions.
-        _assertTransferPreconditions(id, from, to, username, operator, recovery);
+        _assertTransferPreconditions(id, from, to, username, recovery);
 
         // Pause the IdRegistry.
         vm.prank(ID_REGISTRY_OWNER);
@@ -247,7 +225,6 @@ contract IdRegistryTest is ProvenanceTest {
         address caller,
         address from,
         uint8 usernameLength_,
-        address operator,
         address recovery,
         uint256 toPk_,
         uint40 deadline_
@@ -255,21 +232,20 @@ contract IdRegistryTest is ProvenanceTest {
         // Bound inputs that need to be bound.
         vm.assume(caller != from && caller != address(0));
         vm.assume(from != address(0));
-        vm.assume(from != operator);
         uint256 usernameLength = _boundUsernameLength(usernameLength_);
         string memory username = _getRandomValidUniqueUsername(usernameLength);
 
         uint256 toPk = _boundPk(toPk_);
         address to = vm.addr(toPk);
-        vm.assume(to != from && to != operator);
+        vm.assume(to != from);
 
         uint256 deadline = _boundDeadline(deadline_);
 
         // Register the ID that we're going to transfer.
-        uint256 id = _register(from, username, operator, recovery);
+        uint256 id = _register(from, username, recovery);
 
         // Check preconditions.
-        _assertTransferPreconditions(id, from, to, username, operator, recovery);
+        _assertTransferPreconditions(id, from, to, username, recovery);
 
         // Get signature from `to` address authorizing receiving the transfer, and revert as expected.
         bytes memory sig = _signTransfer(toPk, id, to, deadline);
@@ -281,14 +257,12 @@ contract IdRegistryTest is ProvenanceTest {
     function testFuzz_transfer_RevertWhenToAddressAlreadyHasId(
         address from,
         uint8 usernameLength_,
-        address operator,
         address recovery,
         uint256 toPk_,
         uint40 deadline_
     ) public {
         // Bound inputs that need to be bound.
         vm.assume(from != address(0));
-        vm.assume(from != operator);
 
         // Reserve "to" username
         _registeredUsernames["to"] = true;
@@ -298,12 +272,12 @@ contract IdRegistryTest is ProvenanceTest {
 
         uint256 toPk = _boundPk(toPk_);
         address to = vm.addr(toPk);
-        vm.assume(to != from && to != operator);
+        vm.assume(to != from);
 
         uint256 deadline = _boundDeadline(deadline_);
 
         // Register the ID that we're going to transfer.
-        uint256 fromId = _register(from, username, operator, recovery);
+        uint256 fromId = _register(from, username, recovery);
 
         // Register the ID that the `to` address already has.
         _register(to, "to");
@@ -327,7 +301,6 @@ contract IdRegistryTest is ProvenanceTest {
         address caller,
         uint256 fromPk_,
         uint8 usernameLength_,
-        address operator,
         address recovery,
         uint40 fromDeadline_,
         uint256 toPk_,
@@ -336,21 +309,20 @@ contract IdRegistryTest is ProvenanceTest {
         // Bound inputs that need to be bound.
         uint256 fromPk = _boundPk(fromPk_);
         address from = vm.addr(fromPk);
-        vm.assume(from != operator);
 
         uint256 usernameLength = _boundUsernameLength(usernameLength_);
         string memory username = _getRandomValidUniqueUsername(usernameLength);
 
         uint256 toPk = _boundPk(toPk_);
         address to = vm.addr(toPk);
-        vm.assume(to != from && to != operator);
+        vm.assume(to != from);
 
         uint256 fromDeadline = _boundDeadline(fromDeadline_);
         uint256 toDeadline = _boundDeadline(toDeadline_);
 
         // Assert Preconditions
-        uint256 id = _register(from, username, operator, recovery);
-        _assertTransferPreconditions(id, from, to, username, operator, recovery);
+        uint256 id = _register(from, username, recovery);
+        _assertTransferPreconditions(id, from, to, username, recovery);
 
         // Get signature from `to` address authorizing receiving the transfer, and transfer the ID.
         bytes memory fromSig = _signTransfer(fromPk, id, to, fromDeadline);
@@ -361,7 +333,7 @@ contract IdRegistryTest is ProvenanceTest {
         vm.prank(caller);
         idRegistry.transferFor(id, to, fromDeadline, fromSig, toDeadline, toSig);
 
-        _assertTransferPostconditions(id, from, to, username, operator, recovery);
+        _assertTransferPostconditions(id, from, to, username, recovery);
     }
 
     function testFuzz_transferFor_RevertWhenIdRegistryPaused(
@@ -448,17 +420,12 @@ contract IdRegistryTest is ProvenanceTest {
     // TODO: testFuzz_transferUsername_RevertWhenToSignerInvalid
 
     // =============================================================
-    //              transferAndChangeOperatorAndRecovery()
+    //              transferAndClearRecovery()
     // =============================================================
 
-    function testFuzz_transferAndChangeOperatorAndRecovery(
-        address from,
-        uint8 usernameLength_,
-        address newOperator,
-        address newRecovery,
-        uint256 toPk_,
-        uint40 deadline_
-    ) public {
+    function testFuzz_transferAndClearRecovery(address from, uint8 usernameLength_, uint256 toPk_, uint40 deadline_)
+        public
+    {
         // Bound inputs that need to be bound.
         vm.assume(from != address(0));
         uint256 usernameLength = _boundUsernameLength(usernameLength_);
@@ -466,8 +433,7 @@ contract IdRegistryTest is ProvenanceTest {
 
         uint256 toPk = _boundPk(toPk_);
         address to = vm.addr(toPk);
-        vm.assume(to != from && to != newOperator);
-        vm.assume(newOperator != from);
+        vm.assume(to != from);
 
         uint256 deadline = _boundDeadline(deadline_);
 
@@ -475,29 +441,25 @@ contract IdRegistryTest is ProvenanceTest {
         uint256 id = _register(from, username);
 
         // Check preconditions.
-        _assertTransferAndChangePreconditions(id, from, username, to, newOperator, newRecovery);
+        _assertTransferAndChangePreconditions(id, from, username, to);
 
         // Get signature from `to` address authorizing receiving the transfer, and transfer the ID.
-        bytes memory sig = _signTransferAndChangeOperatorAndRecovery(toPk, id, to, newOperator, newRecovery, deadline);
+        bytes memory sig = _signTransfer(toPk, id, to, deadline);
 
         vm.expectEmit();
         emit Transfer(from, to, id);
         vm.expectEmit();
-        emit OperatorAddressChanged(id, newOperator);
-        vm.expectEmit();
-        emit RecoveryAddressChanged(id, newRecovery);
+        emit RecoveryAddressChanged(id, address(0));
         vm.prank(from);
-        idRegistry.transferAndChangeOperatorAndRecovery(to, newOperator, newRecovery, deadline, sig);
+        idRegistry.transferAndClearRecovery(to, deadline, sig);
 
         // Check that the ID was transferred.
-        _assertTransferAndChangePostconditions(id, from, username, to, newOperator, newRecovery);
+        _assertTransferAndChangePostconditions(id, from, username, to, address(0));
     }
 
-    function testFuzz_transferAndChangeOperatorAndRecovery_RevertWhenIdRegistryPaused(
+    function testFuzz_transferAndClearRecovery_RevertWhenIdRegistryPaused(
         address from,
         uint8 usernameLength_,
-        address newOperator,
-        address newRecovery,
         uint256 toPk_,
         uint40 deadline_
     ) public {
@@ -508,8 +470,7 @@ contract IdRegistryTest is ProvenanceTest {
 
         uint256 toPk = _boundPk(toPk_);
         address to = vm.addr(toPk);
-        vm.assume(to != from && to != newOperator);
-        vm.assume(newOperator != from);
+        vm.assume(to != from);
 
         uint256 deadline = _boundDeadline(deadline_);
 
@@ -517,26 +478,24 @@ contract IdRegistryTest is ProvenanceTest {
         uint256 id = _register(from, username);
 
         // Check preconditions.
-        _assertTransferAndChangePreconditions(id, from, username, to, newOperator, newRecovery);
+        _assertTransferAndChangePreconditions(id, from, username, to);
 
         // Pause IdRegistry
         vm.prank(ID_REGISTRY_OWNER);
         idRegistry.pause();
 
         // Get signature from `to` address authorizing receiving the transfer, and transfer the ID.
-        bytes memory sig = _signTransferAndChangeOperatorAndRecovery(toPk, id, to, newOperator, newRecovery, deadline);
+        bytes memory sig = _signTransfer(toPk, id, to, deadline);
 
         vm.expectRevert(EnforcedPause.selector);
         vm.prank(from);
-        idRegistry.transferAndChangeOperatorAndRecovery(to, newOperator, newRecovery, deadline, sig);
+        idRegistry.transferAndClearRecovery(to, deadline, sig);
     }
 
-    function testFuzz_transferAndChangeOperatorAndRecovery_RevertWhenCalledByNonCustody(
+    function testFuzz_transferAndClearRecovery_RevertWhenCalledByNonCustody(
         address caller,
         address from,
         uint8 usernameLength_,
-        address newOperator,
-        address newRecovery,
         uint256 toPk_,
         uint40 deadline_
     ) public {
@@ -547,8 +506,7 @@ contract IdRegistryTest is ProvenanceTest {
 
         uint256 toPk = _boundPk(toPk_);
         address to = vm.addr(toPk);
-        vm.assume(to != from && to != newOperator);
-        vm.assume(newOperator != from);
+        vm.assume(to != from);
 
         vm.assume(caller != from && caller != address(0));
 
@@ -558,20 +516,18 @@ contract IdRegistryTest is ProvenanceTest {
         uint256 id = _register(from, username);
 
         // Check preconditions.
-        _assertTransferAndChangePreconditions(id, from, username, to, newOperator, newRecovery);
+        _assertTransferAndChangePreconditions(id, from, username, to);
 
         // Get signature from `to` address authorizing receiving the transfer, and transfer the ID.
-        bytes memory sig = _signTransferAndChangeOperatorAndRecovery(toPk, id, to, newOperator, newRecovery, deadline);
+        bytes memory sig = _signTransfer(toPk, id, to, deadline);
         vm.expectRevert(OnlyCustody.selector);
         vm.prank(caller);
-        idRegistry.transferAndChangeOperatorAndRecovery(to, newOperator, newRecovery, deadline, sig);
+        idRegistry.transferAndClearRecovery(to, deadline, sig);
     }
 
-    function testFuzz_transferAndChangeOperatorAndRecovery_RevertWhenToAddressAlreadyHasId(
+    function testFuzz_transferAndClearRecovery_RevertWhenToAddressAlreadyHasId(
         address from,
         uint8 usernameLength_,
-        address newOperator,
-        address newRecovery,
         uint256 toPk_,
         uint40 deadline_
     ) public {
@@ -586,8 +542,7 @@ contract IdRegistryTest is ProvenanceTest {
 
         uint256 toPk = _boundPk(toPk_);
         address to = vm.addr(toPk);
-        vm.assume(to != from && to != newOperator);
-        vm.assume(newOperator != from);
+        vm.assume(to != from);
 
         uint256 deadline = _boundDeadline(deadline_);
 
@@ -598,20 +553,19 @@ contract IdRegistryTest is ProvenanceTest {
         _register(to, "to");
 
         // Get signature from `to` address authorizing receiving the transfer, and revert as expected.
-        bytes memory sig =
-            _signTransferAndChangeOperatorAndRecovery(toPk, fromId, to, newOperator, newRecovery, deadline);
+        bytes memory sig = _signTransfer(toPk, fromId, to, deadline);
         vm.expectRevert(CustodyAlreadyRegistered.selector);
         vm.prank(from);
-        idRegistry.transferAndChangeOperatorAndRecovery(to, newOperator, newRecovery, deadline, sig);
+        idRegistry.transferAndClearRecovery(to, deadline, sig);
     }
 
-    // TODO: testFuzz_transferAndChangeOperatorAndRecovery_RevertWhenToDeadlineExpired
-    // TODO: testFuzz_transferAndChangeOperatorAndRecovery_RevertWhenToNonceInvalid
-    // TODO: testFuzz_transferAndChangeOperatorAndRecovery_RevertWhenToSignerInvalid
+    // TODO: testFuzz_transferAndClearRecovery_RevertWhenToDeadlineExpired
+    // TODO: testFuzz_transferAndClearRecovery_RevertWhenToNonceInvalid
+    // TODO: testFuzz_transferAndClearRecovery_RevertWhenToSignerInvalid
 
     // TODO:
     // =============================================================
-    //              transferAndChangeOperatorAndRecoveryFor()
+    //              transferAndClearRecoveryFor()
     // =============================================================
 
     // TODO: Tested sufficiently by UsernameGateway?
@@ -679,16 +633,6 @@ contract IdRegistryTest is ProvenanceTest {
 
     // TODO:
     // =============================================================
-    //                      changeOperator()
-    // =============================================================
-
-    // TODO:
-    // =============================================================
-    //                      changeOperatorFor()
-    // =============================================================
-
-    // TODO:
-    // =============================================================
     //                      changeRecovery()
     // =============================================================
 
@@ -702,6 +646,43 @@ contract IdRegistryTest is ProvenanceTest {
     //                      recover()
     // =============================================================
 
+    function testFuzz_recover(address from, uint8 usernameLength_, address recovery, uint256 toPk_, uint40 deadline_)
+        public
+    {
+        // Bound inputs that need to be bound.
+        vm.assume(from != address(0));
+        uint256 usernameLength = _boundUsernameLength(usernameLength_);
+        string memory username = _getRandomValidUniqueUsername(usernameLength);
+
+        uint256 toPk = _boundPk(toPk_);
+        address to = vm.addr(toPk);
+        vm.assume(to != from);
+
+        uint256 deadline = _boundDeadline(deadline_);
+
+        // Register the ID that we're going to recover.
+        uint256 id = _register(from, username, recovery);
+
+        // Check preconditions. (Recovery is basically a transfer)
+        _assertTransferPreconditions(id, from, to, username, recovery);
+
+        // Get signature from `to` address authorizing receiving the transfer, and transfer the ID.
+        bytes memory sig = _signRecover(toPk, id, to, deadline);
+
+        // Prank recovery address to sign the recovery, and recover the ID.
+        vm.expectEmit();
+        emit Transfer(from, to, id);
+        vm.expectEmit();
+        emit Recovered(id, to);
+
+        vm.prank(recovery);
+        idRegistry.recover(id, to, deadline, sig);
+
+        // Check that the ID was transferred.
+        _assertTransferPostconditions(id, from, to, username, recovery);
+    }
+
+    // TODO: Way more recover tests, not just the golden path.
     // TODO:
     // =============================================================
     //                      recoverFor()
@@ -727,9 +708,97 @@ contract IdRegistryTest is ProvenanceTest {
     //                      View Functions
     // =============================================================
 
-    // TODO: getUserById()
-    // TODO: getIdByUsername()
+    function testFuzz_getUserById(address custody, uint8 usernameLength_, address recovery) public {
+        // Bound inputs that need to be bound.
+        vm.assume(custody != address(0));
+        uint256 usernameLength = _boundUsernameLength(usernameLength_);
+        string memory username = _getRandomValidUniqueUsername(usernameLength);
 
+        // Register the ID that we're going to recover.
+        uint256 id = _register(custody, username, recovery);
+
+        // Get the user by ID and check the results.
+        IdRegistry.User memory user = idRegistry.getUserById(id);
+        assertEq(user.custody, custody);
+        assertEq(user.username, username);
+        assertEq(user.recovery, recovery);
+    }
+
+    function testFuzz_getUserById_RevertWhenIdDoesNotExist(uint256 id) public {
+        vm.expectRevert(HasNoId.selector);
+        idRegistry.getUserById(id);
+    }
+
+    function testFuzz_getIdByUsername(address custody, uint8 usernameLength_, address recovery) public {
+        // Bound inputs that need to be bound.
+        vm.assume(custody != address(0));
+        uint256 usernameLength = _boundUsernameLength(usernameLength_);
+        string memory username = _getRandomValidUniqueUsername(usernameLength);
+
+        // Register the ID that we're going to recover.
+        uint256 id = _register(custody, username, recovery);
+
+        // Get the user by ID and check the results.
+        uint256 id_ = idRegistry.getIdByUsername(username);
+        assertEq(id_, id);
+    }
+
+    function testFuzz_getIdByUsername_RevertWhenUsernameDoesNotExist(uint8 usernameLength_) public {
+        uint256 usernameLength = _boundUsernameLength(usernameLength_);
+        string memory username = _getRandomValidUniqueUsername(usernameLength);
+
+        vm.expectRevert(HasNoId.selector);
+        idRegistry.getIdByUsername(username);
+    }
+
+    function testFuzz_getUserByAddress(address custody, uint8 usernameLength_, address recovery) public {
+        // Bound inputs that need to be bound.
+        vm.assume(custody != address(0));
+        uint256 usernameLength = _boundUsernameLength(usernameLength_);
+        string memory username = _getRandomValidUniqueUsername(usernameLength);
+
+        // Register the ID that we're going to recover.
+        uint256 id = _register(custody, username, recovery);
+
+        // Get the user by ID and check the results.
+        IdRegistry.User memory user = idRegistry.getUserByAddress(custody);
+        assertEq(user.id, id);
+        assertEq(user.custody, custody);
+        assertEq(user.username, username);
+        assertEq(user.recovery, recovery);
+    }
+
+    function testFuzz_getUserByAddress_RevertWhenAddressDoesNotExist(address custody) public {
+        vm.expectRevert(HasNoId.selector);
+        idRegistry.getUserByAddress(custody);
+    }
+
+    function testFuzz_getUserByUsername(address custody, uint8 usernameLength_, address recovery) public {
+        // Bound inputs that need to be bound.
+        vm.assume(custody != address(0));
+        uint256 usernameLength = _boundUsernameLength(usernameLength_);
+        string memory username = _getRandomValidUniqueUsername(usernameLength);
+
+        // Register the ID that we're going to recover.
+        uint256 id = _register(custody, username, recovery);
+
+        // Get the user by ID and check the results.
+        IdRegistry.User memory user = idRegistry.getUserByUsername(username);
+        assertEq(user.id, id);
+        assertEq(user.custody, custody);
+        assertEq(user.username, username);
+        assertEq(user.recovery, recovery);
+    }
+
+    function testFuzz_getUserByUsername_RevertWhenUsernameDoesNotExist(uint8 usernameLength_) public {
+        uint256 usernameLength = _boundUsernameLength(usernameLength_);
+        string memory username = _getRandomValidUniqueUsername(usernameLength);
+
+        vm.expectRevert(HasNoId.selector);
+        idRegistry.getUserByUsername(username);
+    }
+
+    // TODO:
     // =============================================================
     //                      canAct()
     // =============================================================
@@ -751,7 +820,6 @@ contract IdRegistryTest is ProvenanceTest {
         address from,
         address to,
         string memory username,
-        address operator,
         address recovery
     ) internal view {
         assertEq(idRegistry.idOf(from), id);
@@ -761,15 +829,6 @@ contract IdRegistryTest is ProvenanceTest {
 
         assertEq(idRegistry.usernameOf(id), username);
         assertEq(idRegistry.getIdByUsername(username), id);
-
-        if (operator != address(0)) {
-            assertEq(idRegistry.idOf(operator), id);
-            assertEq(idRegistry.operatorOf(id), operator);
-        } else {
-            assertEq(idRegistry.idOf(operator), 0);
-            assertEq(idRegistry.operatorOf(id), address(0));
-        }
-
         assertEq(idRegistry.recoveryOf(id), recovery);
     }
 
@@ -779,7 +838,6 @@ contract IdRegistryTest is ProvenanceTest {
         address from,
         address to,
         string memory username,
-        address operator,
         address recovery
     ) internal view {
         assertEq(idRegistry.idOf(from), 0);
@@ -789,38 +847,22 @@ contract IdRegistryTest is ProvenanceTest {
 
         assertEq(idRegistry.usernameOf(id), username);
         assertEq(idRegistry.getIdByUsername(username), id);
-
-        if (operator != address(0)) {
-            assertEq(idRegistry.idOf(operator), id);
-            assertEq(idRegistry.operatorOf(id), operator);
-        } else {
-            assertEq(idRegistry.idOf(operator), 0);
-            assertEq(idRegistry.operatorOf(id), address(0));
-        }
-
         assertEq(idRegistry.recoveryOf(id), recovery);
     }
 
     // TODO: Doc
-    function _assertTransferAndChangePreconditions(
-        uint256 id,
-        address from,
-        string memory username,
-        address to,
-        address newOperator,
-        address // newRecovery
-    ) internal view {
+    function _assertTransferAndChangePreconditions(uint256 id, address from, string memory username, address to)
+        internal
+        view
+    {
         assertEq(idRegistry.idOf(from), id);
         assertEq(idRegistry.custodyOf(id), from);
-        assertEq(idRegistry.operatorOf(id), address(0));
         assertEq(idRegistry.recoveryOf(id), address(0));
 
         assertEq(idRegistry.usernameOf(id), username);
         assertEq(idRegistry.getIdByUsername(username), id);
 
         assertEq(idRegistry.idOf(to), 0);
-
-        assertEq(idRegistry.idOf(newOperator), 0);
     }
 
     // TODO: Doc
@@ -829,7 +871,6 @@ contract IdRegistryTest is ProvenanceTest {
         address from,
         string memory username,
         address to,
-        address newOperator,
         address newRecovery
     ) internal view {
         assertEq(idRegistry.idOf(from), 0);
@@ -839,14 +880,6 @@ contract IdRegistryTest is ProvenanceTest {
 
         assertEq(idRegistry.usernameOf(id), username);
         assertEq(idRegistry.getIdByUsername(username), id);
-
-        if (newOperator != address(0)) {
-            assertEq(idRegistry.idOf(newOperator), id);
-            assertEq(idRegistry.operatorOf(id), newOperator);
-        } else {
-            assertEq(idRegistry.idOf(newOperator), 0);
-            assertEq(idRegistry.operatorOf(id), address(0));
-        }
 
         assertEq(idRegistry.recoveryOf(id), newRecovery);
     }
@@ -870,26 +903,14 @@ contract IdRegistryTest is ProvenanceTest {
         assertEq(signature.length, 65);
     }
 
-    function _signTransferAndChangeOperatorAndRecovery(
-        uint256 pk,
-        uint256 id,
-        address to,
-        address newOperator,
-        address newRecovery,
-        uint256 deadline
-    ) internal view returns (bytes memory signature) {
+    /// @dev Sign the EIP712 message for a Rransfer transaction.
+    function _signRecover(uint256 pk, uint256 id, address to, uint256 deadline)
+        internal
+        view
+        returns (bytes memory signature)
+    {
         bytes32 digest = idRegistry.hashTypedData(
-            keccak256(
-                abi.encode(
-                    idRegistry.TRANSFER_AND_CHANGE_OPERATOR_AND_RECOVERY_TYPEHASH(),
-                    id,
-                    to,
-                    newOperator,
-                    newRecovery,
-                    idRegistry.nonces(to),
-                    deadline
-                )
-            )
+            keccak256(abi.encode(idRegistry.RECOVER_TYPEHASH(), id, to, idRegistry.nonces(to), deadline))
         );
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, digest);

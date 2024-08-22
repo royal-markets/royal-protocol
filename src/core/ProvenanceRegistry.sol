@@ -3,15 +3,16 @@ pragma solidity ^0.8.0;
 
 import {IProvenanceRegistry} from "./interfaces/IProvenanceRegistry.sol";
 
-import {Withdrawable} from "./abstract/Withdrawable.sol";
+import {Migration} from "./abstract/Migration.sol";
 
-contract ProvenanceRegistry is IProvenanceRegistry, Withdrawable {
+// TODO: Add Migration
+contract ProvenanceRegistry is IProvenanceRegistry, Migration {
     // =============================================================
     //                           CONSTANTS
     // =============================================================
 
     /// @inheritdoc IProvenanceRegistry
-    string public constant VERSION = "2024-07-29";
+    string public constant VERSION = "2024-08-22";
 
     // =============================================================
     //                           STORAGE
@@ -57,11 +58,10 @@ contract ProvenanceRegistry is IProvenanceRegistry, Withdrawable {
     /**
      * @notice Configure ownership of the contract.
      *
+     * @param migrator_ The migrator contract address.
      * @param initialOwner_ The initial owner of the contract.
      */
-    constructor(address initialOwner_) {
-        _initializeOwner(initialOwner_);
-    }
+    constructor(address migrator_, address initialOwner_) Migration(24 hours, migrator_, initialOwner_) {}
 
     // =============================================================
     //                          REGISTRATION
@@ -74,7 +74,7 @@ contract ProvenanceRegistry is IProvenanceRegistry, Withdrawable {
         bytes32 contentHash,
         address nftContract,
         uint256 nftTokenId
-    ) external override whenNotPaused onlyProvenanceGateway returns (uint256 id) {
+    ) public override whenNotPaused onlyProvenanceGateway returns (uint256 id) {
         unchecked {
             id = ++idCounter;
         }
@@ -102,10 +102,12 @@ contract ProvenanceRegistry is IProvenanceRegistry, Withdrawable {
             id: id,
             originatorId: originatorId,
             registrarId: registrarId,
-            contentHash: contentHash,
-            nftContract: nftContract,
-            nftTokenId: nftTokenId
+            contentHash: contentHash
         });
+
+        if (nftContract != address(0)) {
+            emit NftAssigned({provenanceClaimId: id, nftContract: nftContract, nftTokenId: nftTokenId});
+        }
     }
 
     /// @inheritdoc IProvenanceRegistry
@@ -152,11 +154,53 @@ contract ProvenanceRegistry is IProvenanceRegistry, Withdrawable {
     }
 
     // =============================================================
-    //                          STRUCT GETTER
+    //                          MIGRATION
+    // =============================================================
+
+    /// @inheritdoc IProvenanceRegistry
+    function bulkRegisterProvenanceClaims(BulkRegisterData[] calldata data) external override onlyMigrator {
+        uint256 length = data.length;
+        unchecked {
+            for (uint256 i = 0; i < length; i++) {
+                BulkRegisterData calldata d = data[i];
+
+                // NOTE: There is no validation here! We blindly trust the migrator to provide good data.
+                unsafeRegister(d.originatorId, d.registrarId, d.contentHash, d.nftContract, d.nftTokenId);
+            }
+        }
+    }
+
+    // =============================================================
+    //                          VIEW FUNCTIONS
     // =============================================================
 
     /// @inheritdoc IProvenanceRegistry
     function provenanceClaim(uint256 id) external view override returns (ProvenanceClaim memory) {
+        if (id == 0) revert ProvenanceClaimNotFound();
+        return _provenanceClaim[id];
+    }
+
+    function provenanceClaimOfOriginatorAndHash(uint256 originatorId, bytes32 contentHash)
+        external
+        view
+        override
+        returns (ProvenanceClaim memory)
+    {
+        uint256 id = provenanceClaimIdOfOriginatorAndHash[originatorId][contentHash];
+
+        if (id == 0) revert ProvenanceClaimNotFound();
+        return _provenanceClaim[id];
+    }
+
+    function provenanceClaimOfNftToken(address nftContract, uint256 nftTokenId)
+        external
+        view
+        override
+        returns (ProvenanceClaim memory)
+    {
+        uint256 id = provenanceClaimIdOfNftToken[nftContract][nftTokenId];
+
+        if (id == 0) revert ProvenanceClaimNotFound();
         return _provenanceClaim[id];
     }
 }

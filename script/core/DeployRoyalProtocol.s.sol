@@ -51,7 +51,8 @@ contract DeployRoyalProtocol is Script {
         idRegistry.setUsernameGateway(address(usernameGateway));
 
         // Deploy Provenance contracts
-        ProvenanceRegistry provenanceRegistry = new ProvenanceRegistry{salt: provenanceRegistrySalt}(OWNER);
+        ProvenanceRegistry provenanceRegistry =
+            new ProvenanceRegistry{salt: provenanceRegistrySalt}(ID_REGISTRY_MIGRATOR, OWNER);
         console.log("ProvenanceRegistry address: %s", address(provenanceRegistry));
 
         ProvenanceGateway provenanceGateway =
