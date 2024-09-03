@@ -165,7 +165,13 @@ contract ProvenanceRegistry is IProvenanceRegistry, Migration {
                 BulkRegisterData calldata d = data[i];
 
                 // NOTE: There is no validation here! We blindly trust the migrator to provide good data.
-                unsafeRegister(d.originatorId, d.registrarId, d.contentHash, d.nftContract, d.nftTokenId);
+                unsafeRegister({
+                    originatorId: d.originatorId,
+                    registrarId: d.registrarId,
+                    contentHash: d.contentHash,
+                    nftContract: d.nftContract,
+                    nftTokenId: d.nftTokenId
+                });
             }
         }
     }

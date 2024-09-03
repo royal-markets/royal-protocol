@@ -28,11 +28,12 @@ abstract contract Signatures is ISignatures {
      * @param deadline The deadline for the signature to be valid.
      * @param sig The signature to verify.
      */
-    function _verifySig(bytes32 digest, address signer, uint256 deadline, bytes calldata sig) internal view {
+    function _verifySig(bytes32 digest, address signer, uint256 deadline, bytes calldata sig) internal {
         if (block.timestamp > deadline) revert SignatureExpired();
 
-        if (!SignatureCheckerLib.isValidSignatureNowCalldata(signer, digest, sig)) {
-            revert InvalidSignature();
-        }
+        if (SignatureCheckerLib.isValidSignatureNowCalldata(signer, digest, sig)) return;
+        if (SignatureCheckerLib.isValidERC6492SignatureNow(signer, digest, sig)) return;
+
+        revert InvalidSignature();
     }
 }
