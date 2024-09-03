@@ -222,7 +222,7 @@ abstract contract ProvenanceTest is Test {
         returns (uint256 id)
     {
         uint256 originatorId = _register(originator, "originator");
-        uint256 registrarId = _register(registrar, "registrar");
+        _register(registrar, "registrar");
 
         if (registrar != originator) {
             vm.prank(originator);
@@ -245,7 +245,7 @@ abstract contract ProvenanceTest is Test {
         uint256 tokenId
     ) internal returns (uint256 id) {
         uint256 originatorId = _register(originator, "originator");
-        uint256 registrarId = _register(registrar, "registrar");
+        _register(registrar, "registrar");
 
         if (registrar != originator) {
             vm.prank(originator);
