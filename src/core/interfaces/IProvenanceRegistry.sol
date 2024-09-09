@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import {IIdRegistry} from "./IIdRegistry.sol";
+
 interface IProvenanceRegistry {
     // =============================================================
     //                        STRUCTS
@@ -49,21 +51,36 @@ interface IProvenanceRegistry {
     /// @dev Emitted when the Owner sets the ProvenanceGateway to a new value.
     event ProvenanceGatewaySet(address oldProvenanceGateway, address newProvenanceGateway);
 
-    /// @dev Emitted when the Owner freezes the ProvenanceGateway dependency.
-    event ProvenanceGatewayFrozen(address provenanceGateway);
-
     // =============================================================
     //                          ERRORS
     // =============================================================
 
-    /// @dev Error emitted when a ProvenanceClaim is not found.
-    error ProvenanceClaimNotFound();
-
     /// @dev Revert when a non-IdGateway address attempts to call a gated function.
     error OnlyProvenanceGateway();
 
-    /// @dev Error emitted when the ProvenanceGateway is frozen and it is attempting to be modified.
-    error Frozen();
+    /// @dev Error emitted when the originator has no RoyalProtocol ID.
+    error OriginatorDoesNotExist();
+
+    /// @dev Error emitted when the registrar has no RoyalProtocol ID.
+    error RegistrarDoesNotExist();
+
+    /// @dev Revert when an originator has already registered a given bytes32 contentHash.
+    error ContentHashAlreadyRegistered();
+
+    /// @dev Revert when an NFT tokenId was provided on registration sbut the contract address was not.
+    error NftContractRequired();
+
+    /// @dev Error emitted when a ProvenanceClaim is not found.
+    error ProvenanceClaimNotFound();
+
+    /// @dev Error emitted when the ProvenanceClaim already has an assigned NFT.
+    error NftAlreadyAssigned();
+
+    /// @dev Error emitted when the NFT token is not owned by the originator.
+    error NftNotOwnedByOriginator();
+
+    /// @dev Error emitted when the NFT token has already been used by a different ProvenanceClaim.
+    error NftTokenAlreadyUsed();
 
     /* solhint-disable func-name-mixedcase */
     // =============================================================
@@ -82,8 +99,8 @@ interface IProvenanceRegistry {
     /// @notice The ProvenanceGateway contract for the RoyalProtocol.
     function provenanceGateway() external view returns (address);
 
-    /// @notice Whether the ProvenanceGateway dependency is permanently frozen.
-    function provenanceGatewayFrozen() external view returns (bool);
+    /// @notice The IdRegistry contract for the RoyalProtocol.
+    function idRegistry() external view returns (IIdRegistry);
 
     /// @notice The last ProvenanceClaim ID that was issued.
     function idCounter() external view returns (uint256);
@@ -98,6 +115,19 @@ interface IProvenanceRegistry {
         returns (uint256);
 
     // =============================================================
+    //                        INITIALIZATION
+    // =============================================================
+
+    /**
+     * @notice Initialize the IdRegistry contract with the provided `migrator_` and `initialOwner_`.
+     *
+     * @param idRegistry_ The IdRegistry of the RoyalProtocol.
+     * @param migrator_ The migrator of the contract.
+     * @param initialOwner_ The initial owner of the contract.
+     */
+    function initialize(IIdRegistry idRegistry_, address migrator_, address initialOwner_) external;
+
+    // =============================================================
     //                          REGISTRATION
     // =============================================================
 
@@ -107,16 +137,17 @@ interface IProvenanceRegistry {
      * Requirements:
      * - The ProvenanceRegistry must not be paused.
      * - Only callable by the ProvenanceGateway (validation happens there).
+     * - The data must be valid.
      *
      * @param originatorId The RoyalProtocol ID of the originator.
-     * @param registrarId The RoyalProtocol ID of the registrar.
+     * @param registrar The address of the registrar.
      * @param contentHash The blake3 hash of the content which this ProvenanceClaim represents.
      * @param nftContract The NFT contract of the associated NFT of this ProvenanceClaim. (Optional)
      * @param nftTokenId The token ID of the NFT associated with this ProvenanceClaim. (Optional - but required if `nftContract` is included.)
      */
-    function unsafeRegister(
+    function register(
         uint256 originatorId,
-        uint256 registrarId,
+        address registrar,
         bytes32 contentHash,
         address nftContract,
         uint256 nftTokenId
@@ -128,17 +159,13 @@ interface IProvenanceRegistry {
      * Requirements:
      * - The ProvenanceRegistry must not be paused.
      * - Only callable by the ProvenanceGateway (validation happens there).
-     * - Validation happens in ProvenanceGateway:
-     *   - The ProvenanceClaim must exist.
-     *   - The ProvenanceClaim must not already have an assigned NFT.
-     *   - The NFT must not have been used in a ProvenanceClaim before.
-     *   - The NFT must be owned by the originator.
+     * - The data must be valid.
      *
      * @param provenanceClaimId The RoyalProtocol ProvenanceClaim ID we wish to attach an NFT to.
      * @param nftContract The NFT contract of the NFT that will be associated with this ProvenanceClaim.
      * @param nftTokenId The token ID of the NFT that will be associated with this ProvenanceClaim.
      */
-    function unsafeAssignNft(uint256 provenanceClaimId, address nftContract, uint256 nftTokenId) external;
+    function assignNft(uint256 provenanceClaimId, address nftContract, uint256 nftTokenId) external;
 
     // =============================================================
     //                          ONLY OWNER
@@ -146,9 +173,6 @@ interface IProvenanceRegistry {
 
     /// @notice Set the RoyalProtocol ProvenanceGateway contract.
     function setProvenanceGateway(address provenanceGateway_) external;
-
-    /// @notice Freeze the ProvenanceGateway dependency.
-    function freezeProvenanceGateway() external;
 
     // =============================================================
     //                          MIGRATION

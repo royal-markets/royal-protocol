@@ -10,18 +10,16 @@ import {IMigration} from "../interfaces/abstract/IMigration.sol";
  * @notice Provides an abstraction around an initial "migration" for contracts.
  *         It pauses the contract as part of its constructor.
  *         Also note that it is built on Withdrawable, which is built on top of Guardians, which implies Ownable and Pausable.
+ *
+ * @dev - The implementing contract will need to call _initializeOwner() in either the constructor or an initializer.
  */
 abstract contract Migration is IMigration, Withdrawable {
     // =============================================================
-    //                           IMMUTABLES
+    //                            STORAGE
     // =============================================================
 
     /// @inheritdoc IMigration
-    uint24 public immutable GRACE_PERIOD;
-
-    // =============================================================
-    //                            STORAGE
-    // =============================================================
+    uint24 public gracePeriod;
 
     /// @inheritdoc IMigration
     address public migrator;
@@ -40,7 +38,7 @@ abstract contract Migration is IMigration, Withdrawable {
     modifier onlyMigrator() {
         if (msg.sender != migrator) revert OnlyMigrator();
 
-        if (isMigrated() && block.timestamp > migratedAt + GRACE_PERIOD) {
+        if (isMigrated() && block.timestamp > migratedAt + gracePeriod) {
             revert PermissionRevoked();
         }
 
@@ -54,19 +52,16 @@ abstract contract Migration is IMigration, Withdrawable {
 
     /**
      * @notice Set the grace period and migrator address.
-     *         Pauses contract at deployment time.
+     *         Pauses contract at initialization time.
      *
      * @param gracePeriod_  Migration grace period in seconds.
-     * @param migrator_     Initial migrator address (distinct from owner).
-     * @param initialOwner_ Initial owner address.
+     * @param migrator_     Initial migrator address (potentially distinct from owner).
      */
-    constructor(uint24 gracePeriod_, address migrator_, address initialOwner_) {
-        GRACE_PERIOD = gracePeriod_;
+    function _initializeMigrator(uint24 gracePeriod_, address migrator_) internal {
+        gracePeriod = gracePeriod_;
         migrator = migrator_;
-        _initializeOwner(initialOwner_);
 
         emit SetMigrator(address(0), migrator_);
-
         _pause();
     }
 

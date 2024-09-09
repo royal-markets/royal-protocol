@@ -1,0 +1,313 @@
+No files changed, compilation skipped
+
+Ran 8 tests for test/core/Upgradability.t.sol:UpgradabilityTest
+[PASS] testFuzz_idGateway_upgradeToAndCall_RevertWhenNotOwner(address) (runs: 514, μ: 290633, ~: 290633)
+[PASS] testFuzz_idRegistry_upgradeToAndCall_RevertWhenNotOwner(address) (runs: 514, μ: 290640, ~: 290640)
+[PASS] testFuzz_provenanceGateway_upgradeToAndCall_RevertWhenNotOwner(address) (runs: 514, μ: 289248, ~: 289248)
+[PASS] testFuzz_provenanceRegistry_upgradeToAndCall_RevertWhenNotOwner(address) (runs: 514, μ: 289536, ~: 289536)
+[PASS] test_idGateway_upgradeToAndCall() (gas: 294378)
+[PASS] test_idRegistry_upgradeToAndCall() (gas: 294044)
+[PASS] test_provenanceGateway_upgradeToAndCall() (gas: 293844)
+[PASS] test_provenanceRegistry_upgradeToAndCall() (gas: 294059)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 220.98ms (174.45ms CPU time)
+
+Ran 21 tests for test/core/ProvenanceGateway/ProvenanceGateway.t.sol:ProvenanceGatewayTest
+[PASS] testFuzz_RevertWhenReceivingDirectPayment(address,uint256) (runs: 514, μ: 15875, ~: 15993)
+[PASS] testFuzz_assignNft(address,bytes32,bytes32,uint256) (runs: 514, μ: 1383081, ~: 1383619)
+[PASS] testFuzz_registerWithoutNft(address,bytes32,uint256) (runs: 514, μ: 437863, ~: 438306)
+[PASS] testFuzz_register_RevertWhenContentHashAlreadyRegistered(address,bytes32,bytes32,uint256,uint256) (runs: 514, μ: 1423724, ~: 1424301)
+[PASS] testFuzz_register_RevertWhenNftNotOwnedByOriginator(address,address,bytes32,bytes32,uint256) (runs: 514, μ: 1107452, ~: 1107642)
+[PASS] testFuzz_register_RevertWhenNftTokenAlreadyUsed(address,bytes32,bytes32,bytes32,uint256) (runs: 514, μ: 1382736, ~: 1383214)
+[PASS] testFuzz_register_RevertWhenOriginatorDoesNotExist(address,uint256,bytes32,bytes32,uint256) (runs: 514, μ: 878917, ~: 879162)
+[PASS] testFuzz_register_RevertWhenProvenanceGatewayPaused(address,bytes32,bytes32,uint256) (runs: 514, μ: 1091249, ~: 1091443)
+[PASS] testFuzz_register_RevertWhenProvenanceRegistryPaused(address,bytes32,bytes32,uint256) (runs: 514, μ: 1106463, ~: 1106625)
+[PASS] testFuzz_register_RevertWhenRegistrarDoesNotExist(address,address,bytes32,bytes32,uint256) (runs: 514, μ: 1050263, ~: 1050439)
+[PASS] testFuzz_register_RevertWhenUnauthorized(address,address,bytes32,bytes32,uint256) (runs: 514, μ: 1216648, ~: 1216838)
+[PASS] testFuzz_register_WhenCustodyIsCallerAndNftHolder(address,bytes32,bytes32,uint256,uint256) (runs: 514, μ: 1339165, ~: 1339742)
+[PASS] testFuzz_register_WhenRegistrarIsDelegatedByCustody(address,address,bytes32,bytes32,uint256,uint256) (runs: 514, μ: 1691251, ~: 1691965)
+[PASS] testFuzz_register_WhenTwoUsersRegisterTheSameContentHash(address,address,bytes32,bytes32,uint256,uint256,uint256) (runs: 514, μ: 1864000, ~: 1865110)
+[PASS] test_OwnerSetWhenDeployed() (gas: 16282)
+[PASS] test_REGISTER_TYPEHASH() (gas: 14055)
+[PASS] test_UnpausedWhenDeployed() (gas: 15514)
+[PASS] test_VERSION() (gas: 15188)
+[PASS] test_eip712Domain() (gas: 20005)
+[PASS] test_idRegistry() (gas: 18062)
+[PASS] test_provenanceRegistry() (gas: 18697)
+Suite result: ok. 21 passed; 0 failed; 0 skipped; finished in 1.84s (1.84s CPU time)
+
+Ran 94 tests for test/core/IdGateway/IdGateway.t.sol:IdGatewayTest
+[PASS] testFuzz_RevertWhenReceivingDirectPayment(address,uint256) (runs: 514, μ: 16856, ~: 16908)
+[PASS] testFuzz_changeUsername(address,uint8,uint8) (runs: 514, μ: 326768, ~: 326162)
+[PASS] testFuzz_changeUsernameFor(address,uint256,uint8,uint8,uint40) (runs: 514, μ: 368130, ~: 368085)
+[PASS] testFuzz_changeUsernameFor_RevertWhenIdGatewayPaused(address,uint256,uint8,uint8,uint40) (runs: 514, μ: 342697, ~: 342493)
+[PASS] testFuzz_changeUsernameFor_RevertWhenIdRegistryPaused(address,uint256,uint8,uint8,uint40) (runs: 514, μ: 379372, ~: 379331)
+[PASS] testFuzz_changeUsernameFor_RevertWhenUsernameAlreadyRegistered(address,uint256,address,uint8,uint8,uint40) (runs: 514, μ: 485156, ~: 485130)
+[PASS] testFuzz_changeUsernameFor_RevertWhenUsernameContainsInvalidChar(address,uint256,uint8,bytes16,uint40) (runs: 514, μ: 266194, ~: 265289)
+[PASS] testFuzz_changeUsernameFor_RevertWhenUsernameTooLong(address,uint256,uint8,uint8,uint40) (runs: 514, μ: 376639, ~: 344691)
+[PASS] testFuzz_changeUsernameFor_RevertWhenUsernameTooShort(address,uint256,uint8,uint40) (runs: 514, μ: 257034, ~: 255515)
+[PASS] testFuzz_changeUsername_RevertWhenIdGatewayPaused(address,uint8,uint8) (runs: 514, μ: 328572, ~: 328171)
+[PASS] testFuzz_changeUsername_RevertWhenIdRegistryPaused(address,uint8,uint8) (runs: 514, μ: 340430, ~: 340208)
+[PASS] testFuzz_changeUsername_RevertWhenUsernameAlreadyRegistered(address,address,uint8,uint8) (runs: 514, μ: 448980, ~: 448874)
+[PASS] testFuzz_changeUsername_RevertWhenUsernameContainsInvalidChar(address,uint8,bytes16) (runs: 514, μ: 263625, ~: 262578)
+[PASS] testFuzz_changeUsername_RevertWhenUsernameTooLong(address,uint8,uint8) (runs: 514, μ: 377887, ~: 349924)
+[PASS] testFuzz_changeUsername_RevertWhenUsernameTooShort(address,uint8) (runs: 514, μ: 256383, ~: 254959)
+[PASS] testFuzz_checkUsername(uint8) (runs: 514, μ: 59504, ~: 58280)
+[PASS] testFuzz_checkUsername_RevertWhenUsernameAlreadyRegistered(uint8,address) (runs: 514, μ: 217429, ~: 215858)
+[PASS] testFuzz_checkUsername_RevertWhenUsernameContainsInvalidChar(bytes16) (runs: 514, μ: 23461, ~: 23431)
+[PASS] testFuzz_checkUsername_RevertWhenUsernameTooLong(uint8) (runs: 514, μ: 132984, ~: 101660)
+[PASS] testFuzz_forceChangeUsername(address,uint8,uint8) (runs: 514, μ: 322433, ~: 322879)
+[PASS] testFuzz_forceChangeUsername_RevertWhenCalledByNonOwner(address,address,uint8,uint8) (runs: 514, μ: 271972, ~: 271742)
+[PASS] testFuzz_forceChangeUsername_RevertWhenIdRegistryPaused(address,uint8,uint8) (runs: 514, μ: 334630, ~: 334639)
+[PASS] testFuzz_forceChangeUsername_RevertWhenUsernameAlreadyRegistered(address,address,uint8,uint8) (runs: 514, μ: 444987, ~: 444651)
+[PASS] testFuzz_forceChangeUsername_RevertWhenUsernameContainsInvalidChar(address,uint8,bytes16) (runs: 514, μ: 249587, ~: 248298)
+[PASS] testFuzz_forceChangeUsername_RevertWhenUsernameTooLong(address,uint8,uint8) (runs: 514, μ: 367001, ~: 342782)
+[PASS] testFuzz_forceChangeUsername_RevertWhenUsernameTooShort(address,uint8) (runs: 514, μ: 241880, ~: 241329)
+[PASS] testFuzz_forceChangeUsername_WhenIdGatewayPaused(address,uint8,uint8) (runs: 514, μ: 378179, ~: 378519)
+[PASS] testFuzz_forceTransferUsername(address,address,uint8,uint8,uint8) (runs: 514, μ: 531771, ~: 531369)
+[PASS] testFuzz_forceTransferUsername_RevertWhenCalledByNonOwner(address,address,address,uint8,uint8,uint8) (runs: 514, μ: 457234, ~: 456870)
+[PASS] testFuzz_forceTransferUsername_RevertWhenIdRegistryPaused(address,address,uint8,uint8,uint8) (runs: 514, μ: 522047, ~: 521560)
+[PASS] testFuzz_forceTransferUsername_RevertWhenUsernameAlreadyRegistered(address,address,address,uint8,uint8,uint8) (runs: 514, μ: 630838, ~: 630031)
+[PASS] testFuzz_forceTransferUsername_RevertWhenUsernameContainsInvalidChar(address,address,uint8,uint8,bytes16) (runs: 514, μ: 432387, ~: 432489)
+[PASS] testFuzz_forceTransferUsername_RevertWhenUsernameTooLong(address,address,uint8,uint8,uint8) (runs: 514, μ: 542862, ~: 509437)
+[PASS] testFuzz_forceTransferUsername_RevertWhenUsernameTooShort(address,address,uint8,uint8) (runs: 514, μ: 426654, ~: 426351)
+[PASS] testFuzz_forceTransferUsername_WhenIdGatewayPaused(address,address,uint8,uint8,uint8) (runs: 514, μ: 588646, ~: 587892)
+[PASS] testFuzz_recover(address,uint8,address,uint256,uint40) (runs: 514, μ: 384326, ~: 383131)
+[PASS] testFuzz_register(address,uint8,address) (runs: 514, μ: 276420, ~: 274706)
+[PASS] testFuzz_registerFor(address,uint256,uint8,address,uint40) (runs: 514, μ: 327138, ~: 326652)
+[PASS] testFuzz_registerFor_RevertWhenCustodyAlreadyRegistered(address,uint256,uint40) (runs: 514, μ: 288888, ~: 288870)
+[PASS] testFuzz_registerFor_RevertWhenDeadlineExpired(address,uint256,uint8,address,uint40) (runs: 514, μ: 112586, ~: 111395)
+[PASS] testFuzz_registerFor_RevertWhenIdGatewayPaused(address,uint256,uint8,address,uint40) (runs: 514, μ: 140071, ~: 139578)
+[PASS] testFuzz_registerFor_RevertWhenIdRegistryPaused(address,uint256,uint8,address,uint40) (runs: 514, μ: 176032, ~: 175021)
+[PASS] testFuzz_registerFor_RevertWhenNonceInvalid(address,uint256,uint8,address,uint40) (runs: 514, μ: 154162, ~: 153355)
+[PASS] testFuzz_registerFor_RevertWhenSignerInvalid(address,uint256,address,uint8,address,uint40) (runs: 514, μ: 121649, ~: 120574)
+[PASS] testFuzz_registerFor_RevertWhenUsernameAlreadyRegistered(address,uint256,uint256,uint8,uint40) (runs: 514, μ: 343550, ~: 343160)
+[PASS] testFuzz_registerFor_RevertWhenUsernameContainsInvalidChar(address,uint256,bytes16,uint40) (runs: 514, μ: 67569, ~: 67635)
+[PASS] testFuzz_registerFor_RevertWhenUsernameTooLong(address,uint256,uint8,uint40) (runs: 514, μ: 177819, ~: 149451)
+[PASS] testFuzz_registerFor_RevertWhenUsernameTooShort(address,uint256,uint40) (runs: 514, μ: 59026, ~: 59010)
+[PASS] testFuzz_register_RevertWhenCustodyAlreadyRegistered(address) (runs: 514, μ: 224392, ~: 224392)
+[PASS] testFuzz_register_RevertWhenIdGatewayPaused(address,uint8,address) (runs: 514, μ: 123713, ~: 122754)
+[PASS] testFuzz_register_RevertWhenIdRegistryPaused(address,uint8,address) (runs: 514, μ: 128384, ~: 127171)
+[PASS] testFuzz_register_RevertWhenUsernameAlreadyRegistered(address,address,uint8) (runs: 514, μ: 256970, ~: 256356)
+[PASS] testFuzz_register_RevertWhenUsernameContainsInvalidChar(address,bytes16) (runs: 514, μ: 46110, ~: 46152)
+[PASS] testFuzz_register_RevertWhenUsernameTooLong(address,uint8) (runs: 514, μ: 162806, ~: 129041)
+[PASS] testFuzz_register_RevertWhenUsernameTooShort(address) (runs: 514, μ: 40873, ~: 40873)
+[PASS] testFuzz_transfer(address,uint8,address,uint256,uint40) (runs: 514, μ: 380719, ~: 379975)
+[PASS] testFuzz_transferAndClearRecovery(address,uint8,uint256,uint40) (runs: 514, μ: 364897, ~: 364159)
+[PASS] testFuzz_transferAndClearRecovery_RevertWhenCalledByNonCustody(address,address,uint8,uint256,uint40) (runs: 514, μ: 285245, ~: 284811)
+[PASS] testFuzz_transferAndClearRecovery_RevertWhenIdRegistryPaused(address,uint8,uint256,uint40) (runs: 514, μ: 356639, ~: 355928)
+[PASS] testFuzz_transferAndClearRecovery_RevertWhenToAddressAlreadyHasId(address,uint8,uint256,uint40) (runs: 514, μ: 467852, ~: 467198)
+[PASS] testFuzz_transferFor(address,uint256,uint8,address,uint40,uint256,uint40) (runs: 514, μ: 416416, ~: 415426)
+[PASS] testFuzz_transferFor_RevertWhenIdRegistryPaused(address,uint256,uint8,uint40,uint256,uint40) (runs: 514, μ: 371106, ~: 370342)
+[PASS] testFuzz_transferFor_RevertWhenToAddressAlreadyHasAnId(address,uint256,uint8,uint40,uint256,uint40) (runs: 514, μ: 501496, ~: 500372)
+[PASS] testFuzz_transferUsername(address,uint256,uint8,uint8,uint8,uint40) (runs: 514, μ: 584934, ~: 584352)
+[PASS] testFuzz_transferUsernameFor(address,uint256,uint256,uint8,uint8,uint8,uint40,uint40) (runs: 514, μ: 623847, ~: 623167)
+[PASS] testFuzz_transferUsernameFor_RevertWhenIdGatewayPaused(address,uint256,uint256,uint8,uint8,uint8,uint40,uint40) (runs: 514, μ: 540828, ~: 540578)
+[PASS] testFuzz_transferUsernameFor_RevertWhenUsernameAlreadyRegistered(address,uint256,uint256,address,uint8,uint8,uint8,uint40,uint40) (runs: 514, μ: 713432, ~: 713120)
+[PASS] testFuzz_transferUsernameFor_RevertWhenUsernameContainsInvalidChar(address,uint256,uint256,uint8,uint8,bytes16,uint40,uint40) (runs: 514, μ: 457269, ~: 457103)
+[PASS] testFuzz_transferUsernameFor_RevertWhenUsernameTooLong(address,uint256,uint256,uint8,uint8,uint8,uint40,uint40) (runs: 514, μ: 572939, ~: 561064)
+[PASS] testFuzz_transferUsernameFor_RevertWhenUsernameTooShort(address,uint256,uint256,uint8,uint8,uint40,uint40) (runs: 514, μ: 446703, ~: 446935)
+[PASS] testFuzz_transferUsernameFor_RevertWhenWhenIdRegistryPaused(address,uint256,uint256,uint8,uint8,uint8,uint40,uint40) (runs: 514, μ: 611677, ~: 611348)
+[PASS] testFuzz_transferUsername_RevertWhenIdGatewayPaused(address,uint256,uint8,uint8,uint8,uint40) (runs: 514, μ: 519941, ~: 519398)
+[PASS] testFuzz_transferUsername_RevertWhenUsernameAlreadyRegistered(address,uint256,address,uint8,uint8,uint8,uint40) (runs: 514, μ: 670647, ~: 670142)
+[PASS] testFuzz_transferUsername_RevertWhenUsernameContainsInvalidChar(address,uint256,uint8,uint8,bytes16,uint40) (runs: 514, μ: 455869, ~: 456353)
+[PASS] testFuzz_transferUsername_RevertWhenUsernameTooLong(address,uint256,uint8,uint8,uint8,uint40) (runs: 514, μ: 568042, ~: 541346)
+[PASS] testFuzz_transferUsername_RevertWhenUsernameTooShort(address,uint256,uint8,uint8,uint40) (runs: 514, μ: 447622, ~: 447145)
+[PASS] testFuzz_transferUsername_RevertWhenWhenIdRegistryPaused(address,uint256,uint8,uint8,uint8,uint40) (runs: 514, μ: 564338, ~: 563930)
+[PASS] testFuzz_transfer_RevertWhenCalledByNonCustody(address,address,uint8,address,uint256,uint40) (runs: 514, μ: 304896, ~: 304165)
+[PASS] testFuzz_transfer_RevertWhenIdGatewayPaused(address,uint8,address,uint256,uint40) (runs: 514, μ: 347573, ~: 346339)
+[PASS] testFuzz_transfer_RevertWhenIdRegistryPaused(address,uint8,address,uint256,uint40) (runs: 514, μ: 375569, ~: 374352)
+[PASS] testFuzz_transfer_RevertWhenToAddressAlreadyHasId(address,uint8,address,uint256,uint40) (runs: 514, μ: 488423, ~: 487212)
+[PASS] test_CHANGE_RECOVERY_TYPEHASH() (gas: 15024)
+[PASS] test_CHANGE_USERNAME_TYPEHASH() (gas: 14496)
+[PASS] test_OwnerSetWhenDeployed() (gas: 17300)
+[PASS] test_RECOVER_TYPEHASH() (gas: 13550)
+[PASS] test_REGISTER_TYPEHASH() (gas: 15376)
+[PASS] test_TRANSFER_TYPEHASH() (gas: 13410)
+[PASS] test_TRANSFER_USERNAME_TYPEHASH() (gas: 15970)
+[PASS] test_UnpausedWhenDeployed() (gas: 15910)
+[PASS] test_VERSION() (gas: 15897)
+[PASS] test_checkUsername_RevertWhenUsernameIsEmpty() (gas: 15069)
+[PASS] test_checkUsername_RevertWhenUsernameTooShort() (gas: 16250)
+[PASS] test_eip712Domain() (gas: 21386)
+[PASS] test_idRegistry() (gas: 19444)
+Suite result: ok. 94 passed; 0 failed; 0 skipped; finished in 2.49s (16.25s CPU time)
+
+Ran 3 tests for test/extra/RecoveryProxy.t.sol:RecoveryProxyTest
+[PASS] test_recover() (gas: 173060)
+[PASS] test_recover_smart_wallet_deployed() (gas: 449388)
+[PASS] test_recover_smart_wallet_not_deployed() (gas: 464218)
+Suite result: ok. 3 passed; 0 failed; 0 skipped; finished in 3.61s (6.44s CPU time)
+
+Ran 19 tests for test/core/IdRegistry/IdRegistry.t.sol:IdRegistryTest
+[PASS] testFuzz_RevertWhenReceivingDirectPayment(address,uint256) (runs: 514, μ: 15991, ~: 16018)
+[PASS] testFuzz_changeUsername_RevertWhenCalledByNonIdGateway(address,address,uint8,uint8) (runs: 514, μ: 267082, ~: 267193)
+[PASS] testFuzz_getIdByUsername(address,uint8,address) (runs: 514, μ: 229365, ~: 227194)
+[PASS] testFuzz_getIdByUsername_RevertWhenUsernameDoesNotExist(uint8) (runs: 514, μ: 47293, ~: 46193)
+[PASS] testFuzz_getUserByAddress(address,uint8,address) (runs: 514, μ: 231982, ~: 230664)
+[PASS] testFuzz_getUserByAddress_RevertWhenAddressDoesNotExist(address) (runs: 514, μ: 19213, ~: 19213)
+[PASS] testFuzz_getUserById(address,uint8,address) (runs: 514, μ: 231386, ~: 230189)
+[PASS] testFuzz_getUserById_RevertWhenIdDoesNotExist(uint256) (runs: 514, μ: 18455, ~: 18476)
+[PASS] testFuzz_getUserByUsername(address,uint8,address) (runs: 514, μ: 233999, ~: 232413)
+[PASS] testFuzz_getUserByUsername_RevertWhenUsernameDoesNotExist(uint8) (runs: 514, μ: 50097, ~: 48800)
+[PASS] testFuzz_register_RevertWhenCalledByNonIdGateway(address,address,uint8,address) (runs: 514, μ: 72860, ~: 71746)
+[PASS] testFuzz_transferUsername_RevertWhenCalledByNonIdGateway(address,address,address,uint8,uint8,uint8) (runs: 514, μ: 445565, ~: 445080)
+[PASS] test_MigratorSetWhenDeployed() (gas: 16382)
+[PASS] test_OwnerSetWhenDeployed() (gas: 16511)
+[PASS] test_PausedWhenInitialized() (gas: 3346917)
+[PASS] test_VERSION() (gas: 15663)
+[PASS] test_delegateRegistry_DefaultsToV2() (gas: 16006)
+[PASS] test_gracePeriod() (gas: 16755)
+[PASS] test_name() (gas: 14211)
+Suite result: ok. 19 passed; 0 failed; 0 skipped; finished in 3.61s (801.15ms CPU time)
+| lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol:ERC1967Proxy contract |                 |        |        |        |         |
+|-------------------------------------------------------------------------------------------|-----------------|--------|--------|--------|---------|
+| Deployment Cost                                                                           | Deployment Size |        |        |        |         |
+| 190236                                                                                    | 872             |        |        |        |         |
+| Function Name                                                                             | min             | avg    | median | max    | # calls |
+| addRecoverCaller                                                                          | 52928           | 52928  | 52928  | 52928  | 3       |
+| recover                                                                                   | 120419          | 120419 | 120419 | 120419 | 1       |
+
+
+| src/core/IdGateway.sol:IdGateway contract |                 |        |        |        |         |
+|-------------------------------------------|-----------------|--------|--------|--------|---------|
+| Deployment Cost                           | Deployment Size |        |        |        |         |
+| 3315480                                   | 15533           |        |        |        |         |
+| Function Name                             | min             | avg    | median | max    | # calls |
+| CHANGE_RECOVERY_TYPEHASH                  | 1085            | 1085   | 1085   | 1085   | 1       |
+| CHANGE_USERNAME_TYPEHASH                  | 1371            | 1371   | 1371   | 1371   | 5377    |
+| RECOVER_TYPEHASH                          | 359             | 359    | 359    | 359    | 258     |
+| REGISTER_TYPEHASH                         | 909             | 909    | 909    | 909    | 3329    |
+| TRANSFER_TYPEHASH                         | 153             | 153    | 153    | 153    | 3841    |
+| TRANSFER_USERNAME_TYPEHASH                | 1173            | 1173   | 1173   | 1173   | 1793    |
+| VERSION                                   | 1716            | 1716   | 1716   | 1716   | 514     |
+| changeUsername                            | 3297            | 23933  | 17241  | 65237  | 1792    |
+| changeUsernameFor                         | 3303            | 29371  | 3846   | 91195  | 1792    |
+| checkUsername                             | 1361            | 6400   | 2086   | 18112  | 1026    |
+| eip712Domain                              | 1801            | 1801   | 1801   | 1801   | 1       |
+| forceChangeUsername                       | 2575            | 20859  | 10892  | 60228  | 2048    |
+| forceTransferUsername                     | 2949            | 25955  | 11460  | 80007  | 2048    |
+| hashTypedData                             | 1174            | 1174   | 1174   | 1174   | 14592   |
+| idRegistry                                | 2289            | 2289   | 2289   | 2289   | 1       |
+| initialize                                | 69685           | 69685  | 69685  | 69685  | 145     |
+| nonces                                    | 1249            | 3045   | 3249   | 3249   | 15105   |
+| owner                                     | 3216            | 3216   | 3216   | 3216   | 1       |
+| pause                                     | 28619           | 28619  | 28619  | 28619  | 2304    |
+| paused                                    | 2892            | 2892   | 2892   | 2892   | 1       |
+| recover                                   | 84346           | 84346  | 84346  | 84346  | 257     |
+| register                                  | 2710            | 127696 | 137216 | 160047 | 30976   |
+| registerFor                               | 3179            | 56735  | 31538  | 187112 | 3328    |
+| transfer                                  | 3609            | 40827  | 49659  | 82206  | 1280    |
+| transferAndClearRecovery                  | 16874           | 50927  | 50535  | 85763  | 1024    |
+| transferFor                               | 75525           | 87143  | 77732  | 108172 | 768     |
+| transferUsername                          | 3347            | 41152  | 17334  | 116997 | 1792    |
+| transferUsernameFor                       | 4008            | 47168  | 4551   | 143648 | 1792    |
+| upgradeToAndCall                          | 3000            | 3026   | 3000   | 9901   | 257     |
+| useNonce                                  | 23089           | 23089  | 23089  | 23089  | 256     |
+
+
+| src/core/IdRegistry.sol:IdRegistry contract |                 |        |        |        |         |
+|---------------------------------------------|-----------------|--------|--------|--------|---------|
+| Deployment Cost                             | Deployment Size |        |        |        |         |
+| 3058358                                     | 14014           |        |        |        |         |
+| Function Name                               | min             | avg    | median | max    | # calls |
+| VERSION                                     | 1815            | 1815   | 1815   | 1815   | 514     |
+| canAct                                      | 3475            | 7286   | 5668   | 20807  | 4096    |
+| changeUsername                              | 3188            | 20035  | 8550   | 45940  | 2816    |
+| checkIfUsernameExists                       | 1953            | 3384   | 3534   | 5115   | 512     |
+| custodyOf                                   | 897             | 1687   | 897    | 2897   | 11008   |
+| delegateRegistry                            | 2322            | 2322   | 2322   | 2322   | 1       |
+| getIdByAddress                              | 3626            | 3635   | 3637   | 3637   | 5120    |
+| getIdByUsername                             | 2396            | 2966   | 2811   | 5545   | 4352    |
+| getUserByAddress                            | 2875            | 3136   | 3136   | 3398   | 512     |
+| getUserById                                 | 1042            | 2851   | 2518   | 10518  | 514     |
+| getUserByUsername                           | 4052            | 4650   | 4591   | 5504   | 512     |
+| gracePeriod                                 | 3255            | 3255   | 3255   | 3255   | 1       |
+| idCounter                                   | 1507            | 2507   | 2507   | 3507   | 1024    |
+| idOf                                        | 1590            | 1816   | 1590   | 3590   | 29440   |
+| initialize                                  | 94366           | 94366  | 94366  | 94366  | 146     |
+| migrator                                    | 3032            | 3032   | 3032   | 3032   | 1       |
+| name                                        | 451             | 451    | 451    | 451    | 1       |
+| owner                                       | 3139            | 3139   | 3139   | 3139   | 1       |
+| pause                                       | 11464           | 11464  | 11464  | 11464  | 2816    |
+| paused                                      | 793             | 793    | 793    | 793    | 1       |
+| recover                                     | 40941           | 40941  | 40941  | 40941  | 257     |
+| recoveryOf                                  | 1645            | 1978   | 1645   | 3645   | 4609    |
+| register                                    | 3492            | 114932 | 123716 | 145611 | 31747   |
+| setIdGateway                                | 25802           | 25802  | 25802  | 25802  | 145     |
+| transfer                                    | 5592            | 17161  | 7799   | 38143  | 1536    |
+| transferAndClearRecovery                    | 5299            | 18113  | 7506   | 41534  | 768     |
+| transferUsername                            | 3621            | 26627  | 8989   | 65396  | 2816    |
+| unpause                                     | 8722            | 8722   | 8722   | 8722   | 145     |
+| upgradeToAndCall                            | 2945            | 2971   | 2945   | 9846   | 257     |
+| usernameOf                                  | 1035            | 1206   | 1035   | 3035   | 23808   |
+
+
+| src/core/ProvenanceGateway.sol:ProvenanceGateway contract |                 |        |        |        |         |
+|-----------------------------------------------------------|-----------------|--------|--------|--------|---------|
+| Deployment Cost                                           | Deployment Size |        |        |        |         |
+| 2596563                                                   | 12183           |        |        |        |         |
+| Function Name                                             | min             | avg    | median | max    | # calls |
+| REGISTER_TYPEHASH                                         | 631             | 631    | 631    | 631    | 1       |
+| VERSION                                                   | 1350            | 1350   | 1350   | 1350   | 514     |
+| assignNft                                                 | 105841          | 125119 | 125741 | 125741 | 256     |
+| eip712Domain                                              | 1545            | 1545   | 1545   | 1545   | 1       |
+| idRegistry                                                | 2275            | 2275   | 2275   | 2275   | 1       |
+| initialize                                                | 92178           | 92178  | 92178  | 92178  | 145     |
+| owner                                                     | 2938            | 2938   | 2938   | 2938   | 1       |
+| pause                                                     | 28363           | 28363  | 28363  | 28363  | 256     |
+| paused                                                    | 2658            | 2658   | 2658   | 2658   | 1       |
+| provenanceRegistry                                        | 3070            | 3070   | 3070   | 3070   | 1       |
+| register                                                  | 2338            | 133212 | 115889 | 267755 | 4096    |
+| upgradeToAndCall                                          | 2810            | 2836   | 2810   | 9711   | 257     |
+
+
+| src/core/ProvenanceRegistry.sol:ProvenanceRegistry contract |                 |        |        |        |         |
+|-------------------------------------------------------------|-----------------|--------|--------|--------|---------|
+| Deployment Cost                                             | Deployment Size |        |        |        |         |
+| 2679528                                                     | 12266           |        |        |        |         |
+| Function Name                                               | min             | avg    | median | max    | # calls |
+| VERSION                                                     | 1422            | 1422   | 1422   | 1422   | 513     |
+| assignNft                                                   | 62046           | 81324  | 81946  | 81946  | 256     |
+| idCounter                                                   | 1207            | 1873   | 1207   | 3207   | 3072    |
+| initialize                                                  | 94937           | 94937  | 94937  | 94937  | 145     |
+| pause                                                       | 11230           | 11230  | 11230  | 11230  | 256     |
+| provenanceClaim                                             | 2328            | 7128   | 2328   | 14328  | 3840    |
+| provenanceClaimIdOfNftToken                                 | 740             | 1597   | 740    | 2740   | 3584    |
+| provenanceClaimIdOfOriginatorAndHash                        | 470             | 1303   | 470    | 2470   | 3072    |
+| register                                                    | 2879            | 143050 | 168375 | 224818 | 3072    |
+| setProvenanceGateway                                        | 25942           | 25942  | 25942  | 25942  | 145     |
+| unpause                                                     | 8686            | 8686   | 8686   | 8686   | 145     |
+| upgradeToAndCall                                            | 2865            | 2891   | 2865   | 9766   | 257     |
+
+
+| src/extra/RecoveryProxy.sol:RecoveryProxy contract |                 |       |        |       |         |
+|----------------------------------------------------|-----------------|-------|--------|-------|---------|
+| Deployment Cost                                    | Deployment Size |       |        |       |         |
+| 1878799                                            | 8522            |       |        |       |         |
+| Function Name                                      | min             | avg   | median | max   | # calls |
+| addRecoverCaller                                   | 26707           | 26707 | 26707  | 26707 | 3       |
+| initialize                                         | 69606           | 69606 | 69606  | 69606 | 3       |
+| recover                                            | 97211           | 97211 | 97211  | 97211 | 1       |
+
+
+| test/core/Utils.sol:ERC721Mock contract |                 |       |        |       |         |
+|-----------------------------------------|-----------------|-------|--------|-------|---------|
+| Deployment Cost                         | Deployment Size |       |        |       |         |
+| 0                                       | 0               |       |        |       |         |
+| Function Name                           | min             | avg   | median | max   | # calls |
+| mint                                    | 50858           | 66998 | 68210  | 68546 | 3584    |
+| ownerOf                                 | 2510            | 2510  | 2510   | 2510  | 2304    |
+
+
+| test/core/Utils.sol:UpgradeMock contract |                 |     |        |     |         |
+|------------------------------------------|-----------------|-----|--------|-----|---------|
+| Deployment Cost                          | Deployment Size |     |        |     |         |
+| 204960                                   | 753             |     |        |     |         |
+| Function Name                            | min             | avg | median | max | # calls |
+| VERSION                                  | 378             | 378 | 378    | 378 | 4       |
+| proxiableUUID                            | 185             | 185 | 185    | 185 | 4       |
+
+
+
+
+Ran 5 test suites in 11.61s (11.77s CPU time): 145 tests passed, 0 failed, 0 skipped (145 total tests)

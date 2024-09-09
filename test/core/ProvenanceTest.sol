@@ -4,13 +4,13 @@ pragma solidity ^0.8.0;
 import {Test} from "forge-std/Test.sol";
 
 import {IdGateway} from "../../src/core/IdGateway.sol";
-import {UsernameGateway} from "../../src/core/UsernameGateway.sol";
 import {IdRegistry} from "../../src/core/IdRegistry.sol";
 
 import {ProvenanceGateway} from "../../src/core/ProvenanceGateway.sol";
 import {ProvenanceRegistry} from "../../src/core/ProvenanceRegistry.sol";
 
 import {LibString} from "solady/utils/LibString.sol";
+import {LibClone} from "solady/utils/LibClone.sol";
 
 import {DelegateRegistry} from "delegate-registry/DelegateRegistry.sol";
 import {IDelegateRegistry} from "../../src/core/interfaces/IDelegateRegistry.sol";
@@ -50,7 +50,6 @@ abstract contract ProvenanceTest is Test {
     address public immutable ID_REGISTRY_MIGRATOR;
     address public immutable ID_REGISTRY_OWNER;
     address public immutable ID_GATEWAY_OWNER;
-    address public immutable USERNAME_GATEWAY_OWNER;
 
     address public immutable PROVENANCE_REGISTRY_MIGRATOR;
     address public immutable PROVENANCE_REGISTRY_OWNER;
@@ -62,7 +61,6 @@ abstract contract ProvenanceTest is Test {
 
     IdRegistry public idRegistry;
     IdGateway public idGateway;
-    UsernameGateway public usernameGateway;
 
     ProvenanceRegistry public provenanceRegistry;
     ProvenanceGateway public provenanceGateway;
@@ -78,7 +76,6 @@ abstract contract ProvenanceTest is Test {
         ID_REGISTRY_MIGRATOR = vm.addr(0x01);
         ID_REGISTRY_OWNER = vm.addr(0x02);
         ID_GATEWAY_OWNER = vm.addr(0x03);
-        USERNAME_GATEWAY_OWNER = vm.addr(0x04);
 
         PROVENANCE_REGISTRY_MIGRATOR = vm.addr(0x05);
         PROVENANCE_REGISTRY_OWNER = vm.addr(0x06);
@@ -91,18 +88,26 @@ abstract contract ProvenanceTest is Test {
 
     // Set up a fresh IdRegistry/IdGateway for each test
     function setUp() public virtual {
-        idRegistry = new IdRegistry(ID_REGISTRY_MIGRATOR, ID_REGISTRY_OWNER);
-        idGateway = new IdGateway(idRegistry, ID_GATEWAY_OWNER);
-        usernameGateway = new UsernameGateway(idRegistry, USERNAME_GATEWAY_OWNER);
+        address idRegistryImplementation = address(new IdRegistry());
+        idRegistry = IdRegistry(LibClone.deployERC1967(idRegistryImplementation));
+        idRegistry.initialize(ID_REGISTRY_MIGRATOR, ID_REGISTRY_OWNER);
+
+        address idGatewayImplementation = address(new IdGateway());
+        idGateway = IdGateway(LibClone.deployERC1967(idGatewayImplementation));
+        idGateway.initialize(idRegistry, ID_GATEWAY_OWNER);
 
         vm.startPrank(ID_REGISTRY_OWNER);
         idRegistry.setIdGateway(address(idGateway));
-        idRegistry.setUsernameGateway(address(usernameGateway));
         idRegistry.unpause();
         vm.stopPrank();
 
-        provenanceRegistry = new ProvenanceRegistry(PROVENANCE_REGISTRY_MIGRATOR, PROVENANCE_REGISTRY_OWNER);
-        provenanceGateway = new ProvenanceGateway(provenanceRegistry, idRegistry, PROVENANCE_GATEWAY_OWNER);
+        address provenanceRegistryImplementation = address(new ProvenanceRegistry());
+        provenanceRegistry = ProvenanceRegistry(LibClone.deployERC1967(provenanceRegistryImplementation));
+        provenanceRegistry.initialize(idRegistry, PROVENANCE_REGISTRY_MIGRATOR, PROVENANCE_REGISTRY_OWNER);
+
+        address provenanceGatewayImplementation = address(new ProvenanceGateway());
+        provenanceGateway = ProvenanceGateway(LibClone.deployERC1967(provenanceGatewayImplementation));
+        provenanceGateway.initialize(provenanceRegistry, idRegistry, PROVENANCE_GATEWAY_OWNER);
 
         vm.startPrank(PROVENANCE_REGISTRY_OWNER);
         provenanceRegistry.setProvenanceGateway(address(provenanceGateway));
@@ -143,9 +148,9 @@ abstract contract ProvenanceTest is Test {
     /// @dev Validate a username has only valid characters.
     ///      (a-z, A-Z, 0-9, hyphen, underscore)
     ///
-    ///      The code here is basically a carbon-copy of _validateUrlSafe in the UsernameGateway,
+    ///      The code here is basically a carbon-copy of _validateUrlSafe in the IdGateway,
     ///      but we need to be able to generate **invalid** usernames in our tests,
-    ///      and it's nice to not have an implicit dependency on a specific internal function in the UsernameGateway
+    ///      and it's nice to not have an implicit dependency on a specific internal function in the IdGateway
     ///
     ///      We generate invalid usernames by fuzzing byte16s (since 16 characters is the max length of a username),
     ///      and then calling vm.assume(!_validateUsernameCharacters(username)) to ensure it's invalid.

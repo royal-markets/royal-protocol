@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IIdRegistry} from "../core/interfaces/IIdRegistry.sol";
+import {IIdGateway} from "../core/interfaces/IIdGateway.sol";
 
 import {Withdrawable} from "../core/abstract/Withdrawable.sol";
 import {Initializable} from "solady/utils/Initializable.sol";
@@ -11,14 +11,14 @@ import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 
 /**
  * @title RecoveryProxy
- * @notice A contract for managing recovery of IDs using the RoyalProtocol IdRegistry.
+ * @notice A contract for managing recovery of IDs using the RoyalProtocol IdGateway.
  */
 contract RecoveryProxy is Withdrawable, Initializable, UUPSUpgradeable {
     // =============================================================
     //                           IMMUTABLES
     // =============================================================
 
-    address public idRegistry;
+    address public idGateway;
 
     // =============================================================
     //                          CONSTANTS
@@ -34,8 +34,8 @@ contract RecoveryProxy is Withdrawable, Initializable, UUPSUpgradeable {
     //                           EVENTS
     // =============================================================
 
-    /// @notice Emitted when the IdRegistry is set/updated.
-    event SetIdRegistry(address oldIdRegistry, address newIdRegistry);
+    /// @notice Emitted when the IdGateway is set/updated.
+    event SetIdGateway(address oldIdGateway, address newIdGateway);
 
     // =============================================================
     //                          CONSTRUCTOR
@@ -51,12 +51,12 @@ contract RecoveryProxy is Withdrawable, Initializable, UUPSUpgradeable {
 
     /**
      * @notice Initializes the contract.
-     * @param idRegistry_ The address of the IdRegistry contract.
+     * @param idGateway_ The address of the IdGateway contract.
      * @param owner The address of the contract owner.
      */
-    function initialize(address idRegistry_, address owner) external initializer {
+    function initialize(address idGateway_, address owner) external initializer {
         _initializeOwner(owner);
-        idRegistry = idRegistry_;
+        idGateway = idGateway_;
     }
 
     // =============================================================
@@ -75,7 +75,7 @@ contract RecoveryProxy is Withdrawable, Initializable, UUPSUpgradeable {
         onlyRolesOrOwner(RECOVER_CALLER)
         whenNotPaused
     {
-        IIdRegistry(idRegistry).recover(id, to, deadline, sig);
+        IIdGateway(idGateway).recover(id, to, deadline, sig);
     }
 
     // =============================================================
@@ -116,10 +116,10 @@ contract RecoveryProxy is Withdrawable, Initializable, UUPSUpgradeable {
     //                          ADMIN FNs
     // =============================================================
 
-    /// @notice Set the address of the IdRegistry contract.
-    function setIdRegistry(address idRegistry_) external onlyRolesOrOwner(ADMIN) {
-        emit SetIdRegistry(idRegistry, idRegistry_);
-        idRegistry = idRegistry_;
+    /// @notice Set the address of the IdGateway contract.
+    function setIdGateway(address idGateway_) external onlyRolesOrOwner(ADMIN) {
+        emit SetIdGateway(idGateway, idGateway_);
+        idGateway = idGateway_;
     }
 
     // =============================================================

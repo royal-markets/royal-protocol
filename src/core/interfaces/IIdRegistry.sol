@@ -7,7 +7,7 @@ interface IIdRegistry {
     // =============================================================
 
     /**
-     * @dev Struct used in a getter for user data.
+     * @dev Struct used in getters for user data.
      *
      * @param id The user's ID.
      * @param custody The user's custody address. Controls the ID.
@@ -65,20 +65,8 @@ interface IIdRegistry {
     /// @dev Emitted when the Owner sets the IdGateway to a new value.
     event IdGatewaySet(address oldIdGateway, address newIdGateway);
 
-    /// @dev Emitted when the Owner freezes the IdGateway dependency.
-    event IdGatewayFrozen(address idGateway);
-
-    /// @dev Emitted when the Owner sets the UsernameGateway to a new value.
-    event UsernameGatewaySet(address oldUsernameGateway, address newUsernameGateway);
-
-    /// @dev Emitted when the Owner freezes the UsernameGateway dependency.
-    event UsernameGatewayFrozen(address usernameGateway);
-
     /// @dev Emitted when the Owner sets the DelegateRegistry to a new value.
     event DelegateRegistrySet(address oldDelegateRegistry, address newDelegateRegistry);
-
-    /// @dev Emitted when the Owner freezes the DelegateRegistry dependency.
-    event DelegateRegistryFrozen(address delegateRegistry);
 
     /// @dev Emitted when the Migrator sets the IdCounter to a new value as part of the migration process.
     event IdCounterSet(uint256 oldIdCounter, uint256 newIdCounter);
@@ -90,44 +78,14 @@ interface IIdRegistry {
     /// @dev Revert when a non-IdGateway address attempts to call a gated function.
     error OnlyIdGateway();
 
-    /// @dev Revert when a non-UsernameGateway address attempts to call a gated function.
-    error OnlyUsernameGateway();
-
     /// @dev Revert when the provided custody address has already been registered by another ID.
     error CustodyAlreadyRegistered();
-
-    /// @dev Revert when the relevant address is not the custody address of the ID.
-    error OnlyCustody();
-
-    /// @dev Revert when the relevant address is not the recovery address of the ID.
-    error OnlyRecovery();
-
-    /// @dev Revert when the DelegateRegistry or IdGateway dependency is permanently frozen and cannot be updated.
-    error Frozen();
-
-    /// @dev Revert when the relevant username/ID does not exist.
-    error HasNoId();
-
-    //
-    // NOTE: None of the following errors are thrown by IdRegistry,
-    //       but they are thrown by usernameGateway.checkUsername(),
-    //       so are included here so that IdRegistry's ABI includes them.
-    //
-    //       Needed because the bulkRegisterX migration functions live on the IdRegistry contract,
-    //       but they call out to UsernameGateway to validate usernames when validating the registration.
-    //
 
     /// @dev Revert when the provided username has already been registered by another ID.
     error UsernameAlreadyRegistered();
 
-    /// @dev Revert when the username is over 16 bytes.
-    error UsernameTooLong();
-
-    /// @dev Revert when the provided username is too short.
-    error UsernameTooShort();
-
-    /// @dev Revert when the username contains invalid characters.
-    error UsernameContainsInvalidChar();
+    /// @dev Revert when the relevant username/ID does not exist.
+    error HasNoId();
 
     // =============================================================
     //                        CONSTANTS
@@ -141,15 +99,6 @@ interface IIdRegistry {
 
     /// @notice Contract version specified in the RoyalProtocol version scheme.
     function VERSION() external view returns (string memory);
-
-    /// @notice The EIP712 typehash for Transfer signatures.
-    function TRANSFER_TYPEHASH() external view returns (bytes32);
-
-    /// @notice The EIP712 typehash for Recover signatures.
-    function RECOVER_TYPEHASH() external view returns (bytes32);
-
-    /// @notice The EIP712 typehash for ChangeRecovery signatures.
-    function CHANGE_RECOVERY_TYPEHASH() external view returns (bytes32);
 
     /* solhint-enable func-name-mixedcase */
 
@@ -165,20 +114,6 @@ interface IIdRegistry {
      */
     function idGateway() external view returns (address);
 
-    /// @notice Whether the IdGateway dependency is permanently frozen.
-    function idGatewayFrozen() external view returns (bool);
-
-    /**
-     * @notice The address of the UsernameGateway contract - the only address that can change or transfer usernames.
-     *
-     * The UsernameGateway wraps username change logic and provides a swappable abstraction layer around it.
-     * This may be used in the future for stricter/looser username validation.
-     */
-    function usernameGateway() external view returns (address);
-
-    /// @notice Whether the UsernameGateway dependency is permanently frozen.
-    function usernameGatewayFrozen() external view returns (bool);
-
     /**
      * @notice The address of the DelegateRegistry contract. (updatable).
      *
@@ -188,9 +123,6 @@ interface IIdRegistry {
      * It is updatable so that we can extend / swap the functionality of `canAct()` in the future if necessary.
      */
     function delegateRegistry() external view returns (address);
-
-    /// @notice Whether the DelegateRegistry dependency is permanently frozen.
-    function delegateRegistryFrozen() external view returns (bool);
 
     /// @notice The last RoyalProtocol ID that was issued.
     function idCounter() external view returns (uint256);
@@ -211,6 +143,18 @@ interface IIdRegistry {
     function recoveryOf(uint256 id) external view returns (address);
 
     // =============================================================
+    //                        INITIALIZATION
+    // =============================================================
+
+    /**
+     * @notice Initialize the IdRegistry contract with the provided `migrator_` and `initialOwner_`.
+     *
+     * @param migrator_ The address that can migrate.
+     * @param initialOwner_ The initial owner of the contract.
+     */
+    function initialize(address migrator_, address initialOwner_) external;
+
+    // =============================================================
     //                      REGISTRATION
     // =============================================================
 
@@ -227,94 +171,63 @@ interface IIdRegistry {
     //                          TRANSFERS
     // =============================================================
 
-    /// @notice Transfer the caller's ID to another address.
-    ///
-    /// NOTE: This leaves the `recovery` address unchanged.
-    function transfer(address to, uint256 deadline, bytes calldata sig) external;
+    /**
+     * @notice Transfer the given ID to another custody address. Only callable by the IdGateway.
+     *
+     * @param id The ID to transfer.
+     * @param to The address to transfer the ID to.
+     */
+    function transfer(uint256 id, address to) external;
 
-    /// @notice Transfer the provided ID to another address.
-    ///
-    /// NOTE: This leaves the `recovery` address unchanged.
-    function transferFor(
-        uint256 id,
-        address to,
-        uint256 fromDeadline,
-        bytes calldata fromSig,
-        uint256 toDeadline,
-        bytes calldata toSig
-    ) external;
-
-    /// @notice Transfer the caller's ID to another address and clear the recovery address.
-    function transferAndClearRecovery(address to, uint256 deadline, bytes calldata sig) external;
-
-    /// @notice Transfer the provided ID to another address and clear the recovery address.
-    function transferAndClearRecoveryFor(
-        uint256 id,
-        address to,
-        uint256 fromDeadline,
-        bytes calldata fromSig,
-        uint256 toDeadline,
-        bytes calldata toSig
-    ) external;
+    /**
+     * @notice Transfer the given ID to another custody address and clear the recovery address. Only callable by the IdGateway.
+     *
+     * @param id The ID to transfer.
+     * @param to The address to transfer the ID to.
+     */
+    function transferAndClearRecovery(uint256 id, address to) external;
 
     // =============================================================
     //                       TRANSFER USERNAME
     // =============================================================
 
     /**
-     * @notice Transfer the username of the caller's ID to another ID. Only callable by the UsernameGateway.
-     *         Assumes username validation has happened in the UsernameGateway.
+     * @notice Transfer the username of the caller's ID to another ID. Only callable by the IdGateway.
+     *         Assumes most username validation has happened in the IdGateway.
      *
      * @param fromId The ID to transfer the username from.
      * @param toId The ID to transfer the username to.
      * @param newFromUsername The new username for the `from` ID.
      */
-    function unsafeTransferUsername(uint256 fromId, uint256 toId, string calldata newFromUsername) external;
+    function transferUsername(uint256 fromId, uint256 toId, string calldata newFromUsername) external;
 
     // =============================================================
     //                        CHANGE USERNAME
     // =============================================================
 
     /**
-     * @notice Change the username for the provided ID. Only callable by the UsernameGateway.
-     *         Assumes username validation has happened in the UsernameGateway.
+     * @notice Change the username for the provided ID. Only callable by the IdGateway.
+     *         Assumes most username validation has happened in the IdGateway.
      *
      * @param id The ID to change the username for.
      * @param newUsername The new username for the provided `id`.
      */
-    function unsafeChangeUsername(uint256 id, string calldata newUsername) external;
+    function changeUsername(uint256 id, string calldata newUsername) external;
 
     // =============================================================
     //                       RECOVERY LOGIC
     // =============================================================
 
-    /// @notice Change the recovery address for the caller's ID.
-    function changeRecovery(address newRecovery) external;
-
-    /// @notice Change the recovery address for the provided ID.
-    function changeRecoveryFor(uint256 id, address newRecovery, uint256 deadline, bytes calldata sig) external;
-
-    /// @notice Recover the ID of the `from` address ` Called by the recovery address for that ID.
-    function recover(uint256 id, address to, uint256 deadline, bytes calldata sig) external;
+    /// @notice Change the recovery address for the provided ID. Only callable by the IdGateway.
+    function changeRecovery(uint256 id, address newRecovery) external;
 
     /**
-     * @notice Recover the ID of the `from` address on behalf of the ID's recovery address.
+     * @notice Recover the ID of the `from` address ` Only callable by the IdGateway.
      *
-     * @param id The account ID to recover.
-     * @param to The new custody address to recover the ID to.
-     * @param recoveryDeadline The deadline for the signature from the recovery address.
-     * @param recoverySig The signature from the recovery address.
-     * @param toDeadline The deadline for the signature from the new custody address.
-     * @param toSig The signature from the new custody address.
+     * @param id The ID to recover.
+     * @param to The address to transfer the ID to.
      */
-    function recoverFor(
-        uint256 id,
-        address to,
-        uint256 recoveryDeadline,
-        bytes calldata recoverySig,
-        uint256 toDeadline,
-        bytes calldata toSig
-    ) external;
+    function recover(uint256 id, address to) external;
 
     // =============================================================
     //                      PERMISSIONED ACTIONS
@@ -323,20 +236,8 @@ interface IIdRegistry {
     /// @notice Set the IdGateway contract address.
     function setIdGateway(address idGateway_) external;
 
-    /// @notice Freeze the IdGateway dependency.
-    function freezeIdGateway() external;
-
-    /// @notice Set the UsernameGateway contract address.
-    function setUsernameGateway(address usernameGateway_) external;
-
-    /// @notice Freeze the UsernameGateway dependency.
-    function freezeUsernameGateway() external;
-
-    /// @notice Set the DelegateRegistry contract address.
+    /// @notice Set the DelegateRegistry contract address. Only callable by the owner.
     function setDelegateRegistry(address delegateRegistry_) external;
-
-    /// @notice Freeze the DelegateRegistry dependency.
-    function freezeDelegateRegistry() external;
 
     // =============================================================
     //                          MIGRATION
@@ -363,14 +264,19 @@ interface IIdRegistry {
     /// @notice Get the User data for the provided ID.
     function getUserById(uint256 id) external view returns (User memory);
 
-    /// @notice Gets the ID for a given username.
-    function getIdByUsername(string calldata username) external view returns (uint256 id);
-
     /// @notice Gets the User data for the provided custody address.
     function getUserByAddress(address wallet) external view returns (User memory);
 
     /// @notice Gets the User data for a given username.
     function getUserByUsername(string calldata username) external view returns (User memory);
+
+    /// @notice Gets the ID for a given custody address.
+    function getIdByAddress(address wallet) external view returns (uint256 id);
+
+    /// @notice Gets the ID for a given username.
+    function getIdByUsername(string calldata username) external view returns (uint256 id);
+
+    function checkIfUsernameExists(string calldata username) external view returns (bool doesUsernameExist);
 
     // =============================================================
     //                          CAN ACT
@@ -389,11 +295,4 @@ interface IIdRegistry {
      * @param rights The rights being requested. (Optional).
      */
     function canAct(uint256 id, address actor, address contractAddr, bytes32 rights) external view returns (bool);
-
-    // =============================================================
-    //                  SIGNATURE HELPERS - VIEW FNS
-    // =============================================================
-
-    /// @notice Verifies a signature for a given ID is from the `custody` address.
-    function verifyIdSignature(uint256 id, bytes32 digest, bytes calldata sig) external returns (bool isValid);
 }

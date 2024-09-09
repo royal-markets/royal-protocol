@@ -3,15 +3,12 @@ pragma solidity ^0.8.0;
 
 import {IIdRegistry} from "./interfaces/IIdRegistry.sol";
 import {IDelegateRegistry} from "./interfaces/IDelegateRegistry.sol";
-import {IUsernameGateway} from "./interfaces/IUsernameGateway.sol";
 
-import {EIP712} from "./abstract/EIP712.sol";
-import {Nonces} from "./abstract/Nonces.sol";
 import {Migration} from "./abstract/Migration.sol";
-import {Signatures} from "./abstract/Signatures.sol";
 
-import {SignatureCheckerLib} from "solady/utils/SignatureCheckerLib.sol";
 import {LibString} from "solady/utils/LibString.sol";
+import {Initializable} from "solady/utils/Initializable.sol";
+import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 
 /**
  * @title RoyalProtocol IdRegistry
@@ -21,7 +18,7 @@ import {LibString} from "solady/utils/LibString.sol";
  *         Holds all the necessary information for a user, including the custody address, the username, and the recovery address.
  *         Also includes the logic for transferring custody, recovering custody, and changing the recovery address.
  */
-contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
+contract IdRegistry is IIdRegistry, Migration, Initializable, UUPSUpgradeable {
     // =============================================================
     //                        CONSTANTS
     // =============================================================
@@ -38,19 +35,7 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
     /* solhint-enable const-name-snakecase */
 
     /// @inheritdoc IIdRegistry
-    string public constant VERSION = "2024-08-22";
-
-    /// @inheritdoc IIdRegistry
-    bytes32 public constant TRANSFER_TYPEHASH =
-        keccak256("Transfer(uint256 id,address to,uint256 nonce,uint256 deadline)");
-
-    /// @inheritdoc IIdRegistry
-    bytes32 public constant RECOVER_TYPEHASH =
-        keccak256("Recover(uint256 id,address to,uint256 nonce,uint256 deadline)");
-
-    /// @inheritdoc IIdRegistry
-    bytes32 public constant CHANGE_RECOVERY_TYPEHASH =
-        keccak256("ChangeRecovery(uint256 id,address newRecovery,uint256 nonce,uint256 deadline)");
+    string public constant VERSION = "2024-09-07";
 
     /* solhint-enable gas-small-strings */
 
@@ -61,24 +46,10 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
     address public idGateway;
 
     /// @inheritdoc IIdRegistry
-    bool public idGatewayFrozen;
+    address public delegateRegistry;
 
     /// @inheritdoc IIdRegistry
-    address public usernameGateway;
-
-    /// @inheritdoc IIdRegistry
-    bool public usernameGatewayFrozen;
-
-    /// @inheritdoc IIdRegistry
-    ///
-    /// @dev Default to canonical address for the v2 delegate.xyz DelegateRegistry contract.
-    address public delegateRegistry = 0x00000000000000447e69651d841bD8D104Bed493;
-
-    /// @inheritdoc IIdRegistry
-    bool public delegateRegistryFrozen;
-
-    /// @inheritdoc IIdRegistry
-    uint256 public idCounter = 0;
+    uint256 public idCounter;
 
     /// @inheritdoc IIdRegistry
     mapping(address wallet => uint256 id) public idOf;
@@ -106,35 +77,21 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
         _;
     }
 
-    /// @dev Ensures that only the UsernameGateway contract can call the function. (for username operations).
-    modifier onlyUsernameGateway() {
-        if (msg.sender != usernameGateway) revert OnlyUsernameGateway();
+    // =============================================================
+    //                    CONSTRUCTOR / INITIALIZATION
+    // =============================================================
 
-        _;
+    constructor() {
+        _disableInitializers();
     }
 
-    // =============================================================
-    //                          CONSTRUCTOR
-    // =============================================================
+    /// @inheritdoc IIdRegistry
+    function initialize(address migrator_, address initialOwner_) external override initializer {
+        _initializeOwner(initialOwner_);
+        _initializeMigrator(24 hours, migrator_);
 
-    /**
-     * @notice Sets up roles on the contract and pauses it so migrations can take place (if any).
-     *         Pausing takes place in Migration() constructor.
-     *
-     * @param migrator_     Migrator address.
-     * @param initialOwner_ Initial owner address.
-     *
-     */
-    constructor(address migrator_, address initialOwner_) Migration(24 hours, migrator_, initialOwner_) {}
-
-    // =============================================================
-    //                          EIP712
-    // =============================================================
-
-    /// @dev Configure the EIP712 name and version for the domain separator.
-    function _domainNameAndVersion() internal pure override returns (string memory name_, string memory version) {
-        name_ = "RoyalProtocol_IdRegistry";
-        version = "1";
+        // Default to canonical address for the v2 delegate.xyz DelegateRegistry contract.
+        delegateRegistry = 0x00000000000000447e69651d841bD8D104Bed493;
     }
 
     // =============================================================
@@ -142,9 +99,6 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
     // =============================================================
 
     /// @inheritdoc IIdRegistry
-    ///
-    /// @dev Includes `whenNotPaused` because the IdRegistry is paused on deploy, and we may want to run a migration before unpausing.
-    ///      Technically you could handle this by just pausing the IdGateway, but this is more explicit / less error-prone.
     function register(address custody, string calldata username, address recovery)
         external
         override
@@ -153,28 +107,23 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
         returns (uint256 id)
     {
         _validateRegister(custody, username);
-        id = _unsafeRegister({custody: custody, username: username, recovery: recovery});
+        id = _unsafeRegister(custody, username, recovery);
     }
 
     /**
      * @dev Validate the registration of a new ID.
      *
      * - The custody address must not already have a registered ID.
-     * - The username is valid according to the UsernameGateway.
+     * - The username must not already be in use.
      */
     function _validateRegister(address custody, string calldata username) internal view {
+        // Cannot register a custody address that is already in use.
         if (idOf[custody] != 0) revert CustodyAlreadyRegistered();
 
-        // We do validate registers inside a loop in bulk migrations,
-        // but we control the UsernameGateway, so no risk to call out to an external contract.
-        // Also, we don't need to check a return value because checkUsername reverts on failure.
-        //
-        // Can also ignore the return value because the UsernameGateway reverts on any errors, which is all we care about.
-        //
-        // slither-disable-start unused-return
-        // slither-disable-next-line calls-loop
-        IUsernameGateway(usernameGateway).checkUsername(username);
-        // slither-disable-end unused-return
+        // Cannot register a username that is already in use.
+        if (idOfUsernameHash[_calculateUsernameHash(username)] != 0) {
+            revert UsernameAlreadyRegistered();
+        }
     }
 
     /**
@@ -201,14 +150,18 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
 
         // Set up username
         usernameOf[id] = username;
-
-        string memory lowercaseUsername = LibString.lower(username);
-        idOfUsernameHash[keccak256(bytes(lowercaseUsername))] = id;
+        idOfUsernameHash[_calculateUsernameHash(username)] = id;
 
         // Set up recovery
         recoveryOf[id] = recovery;
 
+        // Emit event
         emit Registered({id: id, custody: custody, username: username, recovery: recovery});
+    }
+
+    /// @dev Calculate the hash of a username, ensuring it is lowercased, because usernames are case-insensitive.
+    function _calculateUsernameHash(string memory username) internal pure returns (bytes32) {
+        return keccak256(bytes(LibString.lower(username)));
     }
 
     // =============================================================
@@ -216,59 +169,14 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
     // =============================================================
 
     /// @inheritdoc IIdRegistry
-    function transfer(address to, uint256 deadline, bytes calldata sig) external override {
-        uint256 id = idOf[msg.sender];
-        if (custodyOf[id] != msg.sender) revert OnlyCustody();
-
+    function transfer(uint256 id, address to) external override onlyIdGateway whenNotPaused {
         _validateTransfer(to);
-        _verifyTransferSig({id: id, to: to, deadline: deadline, signer: to, sig: sig});
         _unsafeTransfer(id, to);
     }
 
     /// @inheritdoc IIdRegistry
-    function transferFor(
-        uint256 id,
-        address to,
-        uint256 fromDeadline,
-        bytes calldata fromSig,
-        uint256 toDeadline,
-        bytes calldata toSig
-    ) external override {
+    function transferAndClearRecovery(uint256 id, address to) external override onlyIdGateway whenNotPaused {
         _validateTransfer(to);
-
-        address from = custodyOf[id];
-        _verifyTransferSig({id: id, to: to, deadline: fromDeadline, signer: from, sig: fromSig});
-        _verifyTransferSig({id: id, to: to, deadline: toDeadline, signer: to, sig: toSig});
-
-        _unsafeTransfer(id, to);
-    }
-
-    /// @inheritdoc IIdRegistry
-    function transferAndClearRecovery(address to, uint256 deadline, bytes calldata sig) external override {
-        uint256 id = idOf[msg.sender];
-        if (custodyOf[id] != msg.sender) revert OnlyCustody();
-
-        _validateTransfer(to);
-        _verifyTransferSig({id: id, to: to, deadline: deadline, signer: to, sig: sig});
-
-        _unsafeTransfer(id, to);
-        _unsafeChangeRecovery(id, address(0));
-    }
-
-    /// @inheritdoc IIdRegistry
-    function transferAndClearRecoveryFor(
-        uint256 id,
-        address to,
-        uint256 fromDeadline,
-        bytes calldata fromSig,
-        uint256 toDeadline,
-        bytes calldata toSig
-    ) external override {
-        _validateTransfer(to);
-
-        address from = custodyOf[id];
-        _verifyTransferSig({id: id, to: to, deadline: fromDeadline, signer: from, sig: fromSig});
-        _verifyTransferSig({id: id, to: to, deadline: toDeadline, signer: to, sig: toSig});
 
         _unsafeTransfer(id, to);
         _unsafeChangeRecovery(id, address(0));
@@ -281,7 +189,7 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
     }
 
     /// @dev Transfer an ID from one address to another.
-    function _unsafeTransfer(uint256 id, address to) internal whenNotPaused {
+    function _unsafeTransfer(uint256 id, address to) internal {
         // Delete old custody lookup.
         address from = custodyOf[id];
         idOf[from] = 0;
@@ -289,7 +197,7 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
         // Set new custody address.
         custodyOf[id] = to;
 
-        // This can't actually happen, because of the signature checks.
+        // `to` will NEVER == address(0), but this is a data sanity check.
         if (to != address(0)) {
             idOf[to] = id;
         }
@@ -302,17 +210,17 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
     // =============================================================
 
     /// @inheritdoc IIdRegistry
-    function unsafeTransferUsername(uint256 fromId, uint256 toId, string calldata newFromUsername)
+    function transferUsername(uint256 fromId, uint256 toId, string calldata newFromUsername)
         external
         override
-        onlyUsernameGateway
+        onlyIdGateway
+        whenNotPaused
     {
+        _validateUsername(newFromUsername);
         _unsafeTransferUsername(fromId, toId, newFromUsername);
     }
 
     /// @dev Transfer the current username of `fromId` to `toId`, and set `fromId`'s username to `newFromUsername`.
-    ///
-    /// NOTE: Intentionally omits `whenNotPaused`, because that is handled by the UsernameGateway.
     function _unsafeTransferUsername(uint256 fromId, uint256 toId, string calldata newFromUsername) internal {
         string memory transferredUsername = usernameOf[fromId];
 
@@ -322,25 +230,33 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
         emit UsernameTransferred(fromId, toId, transferredUsername);
     }
 
+    /// @dev Validate that the proposed username is not already in use.
+    function _validateUsername(string calldata username) internal view {
+        // Cannot register a username that is already in use.
+        if (idOfUsernameHash[_calculateUsernameHash(username)] != 0) {
+            revert UsernameAlreadyRegistered();
+        }
+    }
+
     // =============================================================
     //                        CHANGE USERNAME
     // =============================================================
 
     /// @inheritdoc IIdRegistry
-    function unsafeChangeUsername(uint256 id, string calldata newUsername) external override onlyUsernameGateway {
+    function changeUsername(uint256 id, string calldata newUsername) external override onlyIdGateway whenNotPaused {
+        _validateUsername(newUsername);
+
         _unsafeChangeUsername(id, newUsername);
     }
 
     /// @dev Change the username for an ID.
-    ///
-    /// NOTE: Intentionally omits `whenNotPaused`, because that is handled by the UsernameGateway.
     function _unsafeChangeUsername(uint256 id, string memory newUsername) internal {
         // Delete old username lookup hash
-        idOfUsernameHash[keccak256(bytes(LibString.lower(usernameOf[id])))] = 0;
+        idOfUsernameHash[_calculateUsernameHash(usernameOf[id])] = 0;
 
         // Update username
         usernameOf[id] = newUsername;
-        idOfUsernameHash[keccak256(bytes(LibString.lower(newUsername)))] = id;
+        idOfUsernameHash[_calculateUsernameHash(newUsername)] = id;
 
         emit UsernameChanged(id, newUsername);
     }
@@ -350,111 +266,38 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
     // =============================================================
 
     /// @inheritdoc IIdRegistry
-    function changeRecovery(address newRecovery) external override {
-        uint256 id = idOf[msg.sender];
-        if (custodyOf[id] != msg.sender) revert OnlyCustody();
-
-        _unsafeChangeRecovery(id, newRecovery);
-    }
-
-    /// @inheritdoc IIdRegistry
-    function changeRecoveryFor(uint256 id, address newRecovery, uint256 deadline, bytes calldata sig)
-        external
-        override
-    {
-        _verifyChangeRecoverySig({id: id, newRecovery: newRecovery, deadline: deadline, sig: sig});
-
+    function changeRecovery(uint256 id, address newRecovery) external override onlyIdGateway whenNotPaused {
         _unsafeChangeRecovery(id, newRecovery);
     }
 
     /// @dev Change the recovery address for an ID.
-    function _unsafeChangeRecovery(uint256 id, address newRecovery) internal whenNotPaused {
+    function _unsafeChangeRecovery(uint256 id, address newRecovery) internal {
         recoveryOf[id] = newRecovery;
 
         emit RecoveryAddressChanged(id, newRecovery);
     }
 
     /// @inheritdoc IIdRegistry
-    function recover(uint256 id, address to, uint256 deadline, bytes calldata sig) external override {
-        // Revert if the caller is not the recovery address
-        if (recoveryOf[id] != msg.sender) revert OnlyRecovery();
-
+    function recover(uint256 id, address to) external override onlyIdGateway whenNotPaused {
         _validateTransfer(to);
-        _verifyRecoverSig({id: id, to: to, deadline: deadline, signer: to, sig: sig});
-
         _unsafeTransfer(id, to);
-        emit Recovered(id, to);
-    }
 
-    /// @inheritdoc IIdRegistry
-    function recoverFor(
-        uint256 id,
-        address to,
-        uint256 recoveryDeadline,
-        bytes calldata recoverySig,
-        uint256 toDeadline,
-        bytes calldata toSig
-    ) external override {
-        _validateTransfer(to);
-
-        address recovery = recoveryOf[id];
-        _verifyRecoverSig({id: id, to: to, deadline: recoveryDeadline, signer: recovery, sig: recoverySig});
-        _verifyRecoverSig({id: id, to: to, deadline: toDeadline, signer: to, sig: toSig});
-
-        _unsafeTransfer(id, to);
         emit Recovered(id, to);
     }
 
     // =============================================================
     //                      PERMISSIONED ACTIONS
     // =============================================================
-
     /// @inheritdoc IIdRegistry
     function setIdGateway(address idGateway_) external override onlyOwner {
-        if (idGatewayFrozen) revert Frozen();
-
         emit IdGatewaySet(idGateway, idGateway_);
         idGateway = idGateway_;
     }
 
     /// @inheritdoc IIdRegistry
-    function freezeIdGateway() external override onlyOwner {
-        if (idGatewayFrozen) revert Frozen();
-
-        emit IdGatewayFrozen(idGateway);
-        idGatewayFrozen = true;
-    }
-
-    /// @inheritdoc IIdRegistry
-    function setUsernameGateway(address usernameGateway_) external override onlyOwner {
-        if (usernameGatewayFrozen) revert Frozen();
-
-        emit UsernameGatewaySet(usernameGateway, usernameGateway_);
-        usernameGateway = usernameGateway_;
-    }
-
-    /// @inheritdoc IIdRegistry
-    function freezeUsernameGateway() external override onlyOwner {
-        if (usernameGatewayFrozen) revert Frozen();
-
-        emit UsernameGatewayFrozen(usernameGateway);
-        usernameGatewayFrozen = true;
-    }
-
-    /// @inheritdoc IIdRegistry
     function setDelegateRegistry(address delegateRegistry_) external override onlyOwner {
-        if (delegateRegistryFrozen) revert Frozen();
-
         emit DelegateRegistrySet(delegateRegistry, delegateRegistry_);
         delegateRegistry = delegateRegistry_;
-    }
-
-    /// @inheritdoc IIdRegistry
-    function freezeDelegateRegistry() external override onlyOwner {
-        if (delegateRegistryFrozen) revert Frozen();
-
-        emit DelegateRegistryFrozen(delegateRegistry);
-        delegateRegistryFrozen = true;
     }
 
     // =============================================================
@@ -509,13 +352,6 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
     }
 
     /// @inheritdoc IIdRegistry
-    function getIdByUsername(string calldata username) public view override returns (uint256 id) {
-        id = idOfUsernameHash[keccak256(bytes(LibString.lower(username)))];
-
-        if (id == 0) revert HasNoId();
-    }
-
-    /// @inheritdoc IIdRegistry
     function getUserByAddress(address wallet) external view override returns (User memory user) {
         uint256 id = idOf[wallet];
 
@@ -527,6 +363,25 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
         uint256 id = getIdByUsername(username);
 
         return getUserById(id);
+    }
+
+    /// @inheritdoc IIdRegistry
+    function getIdByAddress(address wallet) external view override returns (uint256 id) {
+        id = idOf[wallet];
+
+        if (id == 0) revert HasNoId();
+    }
+
+    /// @inheritdoc IIdRegistry
+    function getIdByUsername(string calldata username) public view override returns (uint256 id) {
+        id = idOfUsernameHash[_calculateUsernameHash(username)];
+
+        if (id == 0) revert HasNoId();
+    }
+
+    /// @inheritdoc IIdRegistry
+    function checkIfUsernameExists(string calldata username) external view override returns (bool doesUsernameExist) {
+        doesUsernameExist = idOfUsernameHash[_calculateUsernameHash(username)] != 0;
     }
 
     // =============================================================
@@ -560,49 +415,9 @@ contract IdRegistry is IIdRegistry, EIP712, Nonces, Migration, Signatures {
     }
 
     // =============================================================
-    //                  SIGNATURE HELPERS - VIEW FNS
+    //                          UUPS
     // =============================================================
 
-    /// @inheritdoc IIdRegistry
-    function verifyIdSignature(uint256 id, bytes32 digest, bytes calldata sig)
-        external
-        view
-        override
-        returns (bool isValid)
-    {
-        address custody = custodyOf[id];
-        isValid = SignatureCheckerLib.isValidSignatureNowCalldata(custody, digest, sig);
-    }
-
-    // =============================================================
-    //                       SIGNATURE HELPERS
-    // =============================================================
-
-    /// @dev Verify the EIP712 signature for a recover transaction.
-    function _verifyRecoverSig(uint256 id, address to, uint256 deadline, address signer, bytes calldata sig) internal {
-        bytes32 digest = _hashTypedData(keccak256(abi.encode(RECOVER_TYPEHASH, id, to, _useNonce(signer), deadline)));
-
-        _verifySig(digest, signer, deadline, sig);
-    }
-
-    /// @dev Verify the EIP712 signature for a transfer(For) transaction.
-    function _verifyTransferSig(uint256 id, address to, uint256 deadline, address signer, bytes calldata sig)
-        internal
-    {
-        bytes32 digest = _hashTypedData(keccak256(abi.encode(TRANSFER_TYPEHASH, id, to, _useNonce(signer), deadline)));
-
-        _verifySig(digest, signer, deadline, sig);
-    }
-
-    /// @dev Verify the EIP712 signature for a changeRecoveryFor transaction.
-    function _verifyChangeRecoverySig(uint256 id, address newRecovery, uint256 deadline, bytes calldata sig) internal {
-        // Needed to get nonce for the user and to verify signature.
-        address custody = custodyOf[id];
-
-        bytes32 digest = _hashTypedData(
-            keccak256(abi.encode(CHANGE_RECOVERY_TYPEHASH, id, newRecovery, _useNonce(custody), deadline))
-        );
-
-        _verifySig(digest, custody, deadline, sig);
-    }
+    // solhint-disable-next-line no-empty-blocks
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

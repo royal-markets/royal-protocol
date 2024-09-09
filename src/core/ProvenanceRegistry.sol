@@ -4,15 +4,22 @@ pragma solidity ^0.8.0;
 import {IProvenanceRegistry} from "./interfaces/IProvenanceRegistry.sol";
 
 import {Migration} from "./abstract/Migration.sol";
+import {Initializable} from "solady/utils/Initializable.sol";
+import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 
-// TODO: Add Migration
-contract ProvenanceRegistry is IProvenanceRegistry, Migration {
+import {IIdRegistry} from "./interfaces/IIdRegistry.sol";
+import {IERC721} from "@openzeppelin/contracts/interfaces/IERC721.sol";
+
+// We trust the IdRegistry to not DoS us when we call it in a loop.
+// slither-disable-start calls-loop
+
+contract ProvenanceRegistry is IProvenanceRegistry, Migration, Initializable, UUPSUpgradeable {
     // =============================================================
     //                           CONSTANTS
     // =============================================================
 
     /// @inheritdoc IProvenanceRegistry
-    string public constant VERSION = "2024-08-22";
+    string public constant VERSION = "2024-09-07";
 
     // =============================================================
     //                           STORAGE
@@ -22,18 +29,17 @@ contract ProvenanceRegistry is IProvenanceRegistry, Migration {
     address public provenanceGateway;
 
     /// @inheritdoc IProvenanceRegistry
-    bool public provenanceGatewayFrozen;
+    IIdRegistry public idRegistry;
 
     /// @inheritdoc IProvenanceRegistry
-    uint256 public idCounter = 0;
+    uint256 public idCounter;
 
     /// @inheritdoc IProvenanceRegistry
     mapping(uint256 originatorId => mapping(bytes32 contentHash => uint256 claimId)) public
         provenanceClaimIdOfOriginatorAndHash;
 
     /// @inheritdoc IProvenanceRegistry
-    mapping(address nftContract => mapping(uint256 nftTokenId => uint256 provenanceClaimId)) public
-        provenanceClaimIdOfNftToken;
+    mapping(address nftContract => mapping(uint256 nftTokenId => uint256 claimId)) public provenanceClaimIdOfNftToken;
 
     /// @dev Internal lookup for ProvenanceClaim by ID.
     ///
@@ -44,7 +50,7 @@ contract ProvenanceRegistry is IProvenanceRegistry, Migration {
     //                          MODIFIERS
     // =============================================================
 
-    /// @dev Ensures that only the ProvenanceGateway contract can call the function. (for initial registration).
+    /// @dev Ensures that only the ProvenanceGateway contract can call the function.
     modifier onlyProvenanceGateway() {
         if (msg.sender != provenanceGateway) revert OnlyProvenanceGateway();
 
@@ -52,25 +58,38 @@ contract ProvenanceRegistry is IProvenanceRegistry, Migration {
     }
 
     // =============================================================
-    //                          CONSTRUCTOR
+    //                    CONSTRUCTOR / INITIALIZATION
     // =============================================================
 
+    constructor() {
+        _disableInitializers();
+    }
+
     /**
-     * @notice Configure ownership of the contract.
+     * @notice Configure ProvenanceRegistry and ownership of the contract.
      *
-     * @param migrator_ The migrator contract address.
+     * @param idRegistry_ The RoyalProtocol IdRegistry contract address.
+     * @param migrator_ The address that can call migration functions on the contract.
      * @param initialOwner_ The initial owner of the contract.
      */
-    constructor(address migrator_, address initialOwner_) Migration(24 hours, migrator_, initialOwner_) {}
+    function initialize(IIdRegistry idRegistry_, address migrator_, address initialOwner_)
+        external
+        override
+        initializer
+    {
+        idRegistry = idRegistry_;
+        _initializeOwner(initialOwner_);
+        _initializeMigrator(24 hours, migrator_);
+    }
 
     // =============================================================
     //                          REGISTRATION
     // =============================================================
 
     /// @inheritdoc IProvenanceRegistry
-    function unsafeRegister(
+    function register(
         uint256 originatorId,
-        uint256 registrarId,
+        address registrar,
         bytes32 contentHash,
         address nftContract,
         uint256 nftTokenId
@@ -78,6 +97,15 @@ contract ProvenanceRegistry is IProvenanceRegistry, Migration {
         unchecked {
             id = ++idCounter;
         }
+
+        // Validate the ProvenanceClaim, reverting on invalid data
+        uint256 registrarId = _validateRegister({
+            originatorId: originatorId,
+            registrar: registrar,
+            contentHash: contentHash,
+            nftContract: nftContract,
+            nftTokenId: nftTokenId
+        });
 
         // Set the provenance claim
         _provenanceClaim[id] = ProvenanceClaim({
@@ -97,7 +125,7 @@ contract ProvenanceRegistry is IProvenanceRegistry, Migration {
             provenanceClaimIdOfNftToken[nftContract][nftTokenId] = id;
         }
 
-        // Emit an event
+        // Emit an event for the new ProvenanceClaim
         emit ProvenanceRegistered({
             id: id,
             originatorId: originatorId,
@@ -105,18 +133,22 @@ contract ProvenanceRegistry is IProvenanceRegistry, Migration {
             contentHash: contentHash
         });
 
+        // If an NFT was assigned, emit an event for that as well
         if (nftContract != address(0)) {
             emit NftAssigned({provenanceClaimId: id, nftContract: nftContract, nftTokenId: nftTokenId});
         }
     }
 
     /// @inheritdoc IProvenanceRegistry
-    function unsafeAssignNft(uint256 provenanceClaimId, address nftContract, uint256 nftTokenId)
+    function assignNft(uint256 provenanceClaimId, address nftContract, uint256 nftTokenId)
         external
         override
         whenNotPaused
         onlyProvenanceGateway
     {
+        // Validate the assignment of an NFT to a provenance claim, reverting on invalid data
+        _validateAssignNft(provenanceClaimId, nftContract, nftTokenId);
+
         // Get the existing provenance claim
         ProvenanceClaim storage pc = _provenanceClaim[provenanceClaimId];
 
@@ -137,20 +169,93 @@ contract ProvenanceRegistry is IProvenanceRegistry, Migration {
 
     /// @inheritdoc IProvenanceRegistry
     function setProvenanceGateway(address provenanceGateway_) external override onlyOwner {
-        if (provenanceGatewayFrozen) revert Frozen();
-
         emit ProvenanceGatewaySet(provenanceGateway, provenanceGateway_);
 
         provenanceGateway = provenanceGateway_;
     }
 
-    /// @inheritdoc IProvenanceRegistry
-    function freezeProvenanceGateway() external override onlyOwner {
-        if (provenanceGatewayFrozen) revert Frozen();
+    // =============================================================
+    //                          VALIDATION
+    // =============================================================
 
-        emit ProvenanceGatewayFrozen(provenanceGateway);
+    /**
+     * @dev Validate the registration DATA of a new provenance claim.
+     *
+     * - The originator must have a registered ID.
+     * - The registrar must have a registered ID.
+     * - The originator must not have already registered this contentHash.
+     * - The NFT must exist and be owned by the originator (held by the custody address).
+     * - The NFT token must not already be associated with an existing ProvenanceClaim.
+     */
+    function _validateRegister(
+        uint256 originatorId,
+        address registrar,
+        bytes32 contentHash,
+        address nftContract,
+        uint256 nftTokenId
+    ) internal view returns (uint256 registrarId) {
+        // Check that the originator exists in the ID_REGISTRY
+        if (idRegistry.custodyOf(originatorId) == address(0)) revert OriginatorDoesNotExist();
 
-        provenanceGatewayFrozen = true;
+        // Check that the registrar exists in the ID_REGISTRY
+        registrarId = idRegistry.idOf(registrar);
+        if (registrarId == 0) revert RegistrarDoesNotExist();
+
+        // Check that the originator has not already registered this contentHash previously.
+        if (provenanceClaimIdOfOriginatorAndHash[originatorId][contentHash] > 0) {
+            revert ContentHashAlreadyRegistered();
+        }
+
+        // If an NFT token ID was provided, check that the NFT contract is also provided
+        if (nftTokenId > 0 && nftContract == address(0)) revert NftContractRequired();
+
+        // If the NFT is provided:
+        if (nftContract != address(0)) {
+            _checkNft(originatorId, nftContract, nftTokenId);
+        }
+    }
+
+    /**
+     * @dev Validate the DATA of assigning an NFT to an existing ProvenanceClaim.
+     *
+     * - The ProvenanceClaim must exist.
+     * - The ProvenanceClaim must not have a pre-existing NFT assigned.
+     * - The NFT must exist and be owned by the originator (held by the custody address).
+     * - The NFT token must not already be associated with an existing ProvenanceClaim.
+     */
+    function _validateAssignNft(uint256 provenanceClaimId, address nftContract, uint256 nftTokenId) internal view {
+        // Check that the provenance claim exists
+        if (provenanceClaimId > idCounter) revert ProvenanceClaimNotFound();
+        uint256 originatorId = _provenanceClaim[provenanceClaimId].originatorId;
+
+        // Check that the provenance claim does not already have an NFT assigned
+        if (_provenanceClaim[provenanceClaimId].nftContract != address(0)) {
+            revert NftAlreadyAssigned();
+        }
+
+        // NFT contract is required data for assigning an NFT
+        if (nftContract == address(0)) revert NftContractRequired();
+
+        // Check that the NFT exists and is owned by the originator
+        _checkNft(originatorId, nftContract, nftTokenId);
+    }
+
+    /**
+     * @dev Validate the assignment of an NFT to a provenance claim.
+     *
+     * - The NFT must exist and be owned by the originator (held by the custody address).
+     * - The NFT token must not already be associated with an existing ProvenanceClaim.
+     */
+    function _checkNft(uint256 originatorId, address nftContract, uint256 nftTokenId) internal view {
+        // Check that the NFT exists and is owned by the originator
+        if (idRegistry.idOf(IERC721(nftContract).ownerOf(nftTokenId)) != originatorId) {
+            revert NftNotOwnedByOriginator();
+        }
+
+        // Check that the NFT token has not already been used
+        if (provenanceClaimIdOfNftToken[nftContract][nftTokenId] > 0) {
+            revert NftTokenAlreadyUsed();
+        }
     }
 
     // =============================================================
@@ -164,10 +269,11 @@ contract ProvenanceRegistry is IProvenanceRegistry, Migration {
             for (uint256 i = 0; i < length; i++) {
                 BulkRegisterData calldata d = data[i];
 
-                // NOTE: There is no validation here! We blindly trust the migrator to provide good data.
-                unsafeRegister({
+                address registrar = idRegistry.custodyOf(d.registrarId);
+
+                register({
                     originatorId: d.originatorId,
-                    registrarId: d.registrarId,
+                    registrar: registrar,
                     contentHash: d.contentHash,
                     nftContract: d.nftContract,
                     nftTokenId: d.nftTokenId
@@ -186,6 +292,7 @@ contract ProvenanceRegistry is IProvenanceRegistry, Migration {
         return _provenanceClaim[id];
     }
 
+    /// @inheritdoc IProvenanceRegistry
     function provenanceClaimOfOriginatorAndHash(uint256 originatorId, bytes32 contentHash)
         external
         view
@@ -198,6 +305,7 @@ contract ProvenanceRegistry is IProvenanceRegistry, Migration {
         return _provenanceClaim[id];
     }
 
+    /// @inheritdoc IProvenanceRegistry
     function provenanceClaimOfNftToken(address nftContract, uint256 nftTokenId)
         external
         view
@@ -209,4 +317,12 @@ contract ProvenanceRegistry is IProvenanceRegistry, Migration {
         if (id == 0) revert ProvenanceClaimNotFound();
         return _provenanceClaim[id];
     }
+
+    // =============================================================
+    //                          UUPS
+    // =============================================================
+
+    // solhint-disable-next-line no-empty-blocks
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }
+// slither-disable-end calls-loop

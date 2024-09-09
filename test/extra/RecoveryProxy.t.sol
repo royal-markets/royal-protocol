@@ -28,9 +28,8 @@ contract RecoveryProxyTest is ProvenanceTest {
         _recoveryProxyOwnerPrivateKey = 0x0A1CE;
 
         recoveryProxy = new RecoveryProxy();
-        bytes memory data = abi.encodeWithSelector(
-            RecoveryProxy.initialize.selector, idRegistry, vm.addr(_recoveryProxyOwnerPrivateKey)
-        );
+        bytes memory data =
+            abi.encodeWithSelector(RecoveryProxy.initialize.selector, idGateway, vm.addr(_recoveryProxyOwnerPrivateKey));
 
         proxy = address(new ERC1967Proxy(address(recoveryProxy), data));
         recoveryProxy = RecoveryProxy(proxy);
@@ -39,7 +38,6 @@ contract RecoveryProxyTest is ProvenanceTest {
         recoveryProxy.addRecoverCaller(proxy);
 
         vm.startPrank(address(idGateway));
-
         address custody = vm.addr(_fromPrivateKey);
         idRegistry.register(custody, "username", proxy);
         vm.stopPrank();
@@ -57,10 +55,10 @@ contract RecoveryProxyTest is ProvenanceTest {
         bytes32 domainSeparator = keccak256(
             abi.encode(
                 keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256(bytes("RoyalProtocol_IdRegistry")),
+                keccak256(bytes("RoyalProtocol_IdGateway")),
                 keccak256(bytes("1")),
                 block.chainid,
-                address(idRegistry)
+                address(idGateway)
             )
         );
 
@@ -68,7 +66,7 @@ contract RecoveryProxyTest is ProvenanceTest {
             abi.encodePacked(
                 "\x19\x01",
                 domainSeparator,
-                keccak256(abi.encode(idRegistry.RECOVER_TYPEHASH(), id, to, idRegistry.nonces(to), deadline))
+                keccak256(abi.encode(idGateway.RECOVER_TYPEHASH(), id, to, idGateway.nonces(to), deadline))
             )
         );
 

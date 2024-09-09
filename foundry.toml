@@ -9,8 +9,10 @@ fs_permissions = [{ access = "read", path = "./script"}]
 # Optimism chains upgrades: https://docs.optimism.io/builders/node-operators/network-upgrades/canyon
 # - Supports PUSH0 as of 2024-01-11
 # - Supports transient opcodes and MCOPY as of 2024-03-14
-solc = "0.8.26"
+solc = "0.8.27"
 evm_version = "cancun"
+optimizer_runs = 100_000
+fuzz = { runs = 512 }
 
 # This is lame, but required by the Provenance contracts.
 via_ir=true
@@ -20,6 +22,15 @@ via_ir=true
 # See: https://github.com/foundry-rs/foundry/issues/6402#issuecomment-2074741336
 # See: https://github.com/foundry-rs/foundry/pull/6656
 always_use_create_2_factory = true
+
+# ignore solc warnings for unreachable code and contract initcode size limits.
+# known error codes are: ["unreachable", "unused-return", "unused-param", "unused-var", "code-size", "shadowing", "func-mutability", "license", "pragma-solidity", "virtual-interfaces", "same-varname"]
+# additional warnings can be added using their numeric error code: ["license", 1337]
+#
+# We disable unreachable because our test Utils UpgradeMock contract disables upgrades and causes some aspects of the imported UUPSUpgradable to become unreachable.
+# We disable initcode size limit (3860) because our scripts and tests import a ton of stuff and hit the code size limits, but will never themselves be deployed.
+# We disable contract code size limit (5574) because our scripts import a ton of stuff and hit the code size limits, but will never themselves be deployed.
+ignored_error_codes = ["unreachable", 3860, 5574]
 
 [doc]
 # The path to the directory where the documentation will be generated.

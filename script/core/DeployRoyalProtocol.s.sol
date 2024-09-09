@@ -5,9 +5,10 @@ import {Script, console} from "forge-std/Script.sol";
 
 import {IdRegistry} from "../../src/core/IdRegistry.sol";
 import {IdGateway} from "../../src/core/IdGateway.sol";
-import {UsernameGateway} from "../../src/core/UsernameGateway.sol";
 import {ProvenanceRegistry} from "../../src/core/ProvenanceRegistry.sol";
 import {ProvenanceGateway} from "../../src/core/ProvenanceGateway.sol";
+
+import {LibClone} from "solady/utils/LibClone.sol";
 
 contract DeployRoyalProtocol is Script {
     // =============================================================
@@ -15,14 +16,18 @@ contract DeployRoyalProtocol is Script {
     // =============================================================
 
     // NOTE: Get initcode hashes from CalculateSalts script, and then salts from maldon (or create2crunch/cast).
-    bytes32 idRegistrySalt = 0x0000000000000000000000000000000000000000fc16b93e000f0000cacf55a5;
-    bytes32 idGatewaySalt = 0x000000000000000000000000000000000000000059224fd23c24440000a0154b;
-    bytes32 usernameGatewaySalt = 0x000000000000000000000000000000000000000007fe84df4f04000065c41748;
-    bytes32 provenanceRegistrySalt = 0x00000000000000000000000000000000000000006294e7302ec4000020d23464;
-    bytes32 provenanceGatewaySalt = 0x00000000000000000000000000000000000000007cecb2788cc4000014f0b433;
+    bytes32 idRegistrySalt = 0x694c5b53b119242271223db1d98d933bceb6d66678b2632597827ced92540255;
+    bytes32 idGatewaySalt = 0x5c04a4a41ecb50ba09e6cc0ea8f9fa386da6472f459fa4e8405983201063a5ac;
+    bytes32 provenanceRegistrySalt = 0xae6820d88773a3aab8aa8896480ed88ac1b174d01f3955a1ad161e335ef42411;
+    bytes32 provenanceGatewaySalt = 0xa041d7c995b5cf119ca344195e34cee5d16f5da9e5850b68eb9f1c8149449576;
+
+    bytes32 idRegistryProxySalt = 0x2f12417320790ce587c16f9d13ffbe7fa3b1d31f8e3856728bca4e5a00663052;
+    bytes32 idGatewayProxySalt = 0xa4c0f5d2ed58ddd62d2ae7e372e00abb2549ffaa2e3500d5ffc7b543d8717d2c;
+    bytes32 provenanceRegistryProxySalt = 0xa443b9112e21b5e3f715b035d541a7b0140aa043fe6be10b908435849fc21f18;
+    bytes32 provenanceGatewayProxySalt = 0xb96f58746c0581b1ac7c78c157ded10a92623443db30ff304a810addfc74bc56;
 
     address public constant OWNER = 0x62Bd6bD77403268E387a8c7e09aF5D3127186be8;
-    address public constant ID_REGISTRY_MIGRATOR = 0xE5673eD07d596E558D280DACdaE346FAF9c9B1A7;
+    address public constant MIGRATOR = 0xE5673eD07d596E558D280DACdaE346FAF9c9B1A7;
 
     // =============================================================
     //                          SCRIPT
@@ -37,26 +42,34 @@ contract DeployRoyalProtocol is Script {
         vm.startBroadcast();
 
         // Deploy Account contracts
-        IdRegistry idRegistry = new IdRegistry{salt: idRegistrySalt}(ID_REGISTRY_MIGRATOR, OWNER);
+        address idRegistryImplementation = address(new IdRegistry{salt: idRegistrySalt}());
+        IdRegistry idRegistry =
+            IdRegistry(LibClone.deployDeterministicERC1967(idRegistryImplementation, idRegistryProxySalt));
+        idRegistry.initialize(MIGRATOR, OWNER);
         console.log("IdRegistry address: %s", address(idRegistry));
 
-        IdGateway idGateway = new IdGateway{salt: idGatewaySalt}(idRegistry, OWNER);
+        address idGatewayImplementation = address(new IdGateway{salt: idGatewaySalt}());
+        IdGateway idGateway =
+            IdGateway(LibClone.deployDeterministicERC1967(idGatewayImplementation, idGatewayProxySalt));
+        idGateway.initialize(idRegistry, OWNER);
         console.log("IdGateway address: %s", address(idGateway));
-
-        UsernameGateway usernameGateway = new UsernameGateway{salt: usernameGatewaySalt}(idRegistry, OWNER);
-        console.log("UsernameGateway address: %s", address(usernameGateway));
 
         // Configure gateways on the IdRegistry
         idRegistry.setIdGateway(address(idGateway));
-        idRegistry.setUsernameGateway(address(usernameGateway));
 
         // Deploy Provenance contracts
-        ProvenanceRegistry provenanceRegistry =
-            new ProvenanceRegistry{salt: provenanceRegistrySalt}(ID_REGISTRY_MIGRATOR, OWNER);
+        address provenanceRegistryImplementation = address(new ProvenanceRegistry{salt: provenanceRegistrySalt}());
+        ProvenanceRegistry provenanceRegistry = ProvenanceRegistry(
+            LibClone.deployDeterministicERC1967(provenanceRegistryImplementation, provenanceRegistryProxySalt)
+        );
+        provenanceRegistry.initialize(idRegistry, MIGRATOR, OWNER);
         console.log("ProvenanceRegistry address: %s", address(provenanceRegistry));
 
-        ProvenanceGateway provenanceGateway =
-            new ProvenanceGateway{salt: provenanceGatewaySalt}(provenanceRegistry, idRegistry, OWNER);
+        address provenanceGatewayImplementation = address(new ProvenanceGateway{salt: provenanceGatewaySalt}());
+        ProvenanceGateway provenanceGateway = ProvenanceGateway(
+            LibClone.deployDeterministicERC1967(provenanceGatewayImplementation, provenanceGatewayProxySalt)
+        );
+        provenanceGateway.initialize(provenanceRegistry, idRegistry, OWNER);
         console.log("ProvenanceGateway address: %s", address(provenanceGateway));
 
         // Set the ProvenanceGateway on the ProvenanceRegistry

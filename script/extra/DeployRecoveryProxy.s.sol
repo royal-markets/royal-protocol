@@ -15,7 +15,7 @@ contract DeployRecoveryProxy is Script {
     address public constant OWNER = address(0);
 
     // NOTE: Fill in the address of the IdRegistry.
-    address public constant ID_REGISTRY = 0x00000000F74144b0dF049137A0F9416a920F2514;
+    address public constant ID_REGISTRY = 0x0000009ca17b183710537F72A8A7b079cdC8Abe2;
 
     // NOTE: (Optional): Fill in this address, which is the address that will be able to call `recover` on the RecoveryProxy.
     address public constant RECOVER_CALLER = address(0);

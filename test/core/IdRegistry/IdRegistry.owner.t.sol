@@ -8,4 +8,4 @@ import {Test} from "forge-std/Test.sol";
 
 // TODO: Placeholder - should write tests here.
 // solhint-disable-next-line no-empty-blocks
-contract IdGatewayOwnable is Test {}
+contract IdRegistryOwnable is Test {}
