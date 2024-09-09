@@ -5,19 +5,27 @@ import {IProvenanceRegistry} from "./IProvenanceRegistry.sol";
 import {IIdRegistry} from "./IIdRegistry.sol";
 
 interface IProvenanceGateway {
+    // NOTE: None of these events are actually emitted by ProvenanceGateway, but because they are emitted when calling the ProvenanceRegistry,
+    //       they are included here so that ProvenanceGateway's ABI includes them.
+    //
     // =============================================================
     //                           EVENTS
     // =============================================================
 
-    /// @dev Emitted when the Owner sets the IdRegistry to a new value.
-    event IdRegistrySet(address oldIdRegistry, address newIdRegistry);
+    /// @dev Emitted when a new ProvenanceClaim is registered.
+    event ProvenanceRegistered(
+        uint256 id, uint256 indexed originatorId, uint256 indexed registrarId, bytes32 indexed contentHash
+    );
 
-    /// @dev Emitted when the Owner freezes the IdRegistry dependency.
-    event IdRegistryFrozen(address idRegistry);
+    /// @dev Emitted when an NFT is assigned to an existing ProvenanceClaim without an NFT.
+    event NftAssigned(uint256 indexed provenanceClaimId, address indexed nftContract, uint256 nftTokenId);
 
     // =============================================================
     //                          ERRORS
     // =============================================================
+
+    // The following errors are potentially emitted by the ProvenanceRegistry contract,
+    // but included here for convenience.
 
     /// @dev Error emitted when the originator has no RoyalProtocol ID.
     error OriginatorDoesNotExist();
@@ -31,26 +39,17 @@ interface IProvenanceGateway {
     /// @dev Revert when an NFT tokenId was provided on registration sbut the contract address was not.
     error NftContractRequired();
 
+    /// @dev Error emitted when a ProvenanceClaim is not found.
+    error ProvenanceClaimNotFound();
+
+    /// @dev Error emitted when the ProvenanceClaim already has an assigned NFT.
+    error NftAlreadyAssigned();
+
     /// @dev Error emitted when the NFT token is not owned by the originator.
     error NftNotOwnedByOriginator();
 
     /// @dev Error emitted when the NFT token has already been used by a different ProvenanceClaim.
     error NftTokenAlreadyUsed();
-
-    /// @dev Error emitted when the ProvenanceClaim ID does not exist.
-    error ProvenanceClaimDoesNotExist();
-
-    /// @dev Error emitted when the ProvenanceClaim already has an assigned NFT.
-    error NftAlreadyAssigned();
-
-    /// @dev Revert when the signature provided is invalid.
-    error InvalidSignature();
-
-    /// @dev Revert when the block.timestamp is ahead of the signature deadline.
-    error SignatureExpired();
-
-    /// @dev Error emitted when the IdRegistry is frozen and it is attempting to be modified.
-    error Frozen();
 
     // =============================================================
     //                           CONSTANTS
@@ -68,26 +67,31 @@ interface IProvenanceGateway {
     /// @notice The EIP712 typehash for AssignNft signatures (for assigning NFTs to an existing ProvenanceClaim without an assigned NFT).
     function ASSIGN_NFT_TYPEHASH() external view returns (bytes32);
 
-    // =============================================================
-    //                           IMMUTABLES
-    // =============================================================
-
-    /// @notice The RoyalProtocol ProvenanceRegistry contract.
-    function PROVENANCE_REGISTRY() external view returns (IProvenanceRegistry);
-
     /* solhint-enable func-name-mixedcase */
 
     // =============================================================
     //                           STORAGE
     // =============================================================
 
+    /// @notice The RoyalProtocol ProvenanceRegistry contract.
+    function provenanceRegistry() external view returns (IProvenanceRegistry);
+
     /// @notice The RoyalProtocol IdRegistry contract.
-    ///
-    /// Intentionally updatable, because the account/identity system might evolve independently of the Provenance system.
     function idRegistry() external view returns (IIdRegistry);
 
-    /// @notice Whether the IdRegistry dependency is permanently frozen.
-    function idRegistryFrozen() external view returns (bool);
+    // =============================================================
+    //                        INITIALIZATION
+    // =============================================================
+
+    /**
+     * @notice Configure ProvenanceRegistry and ownership of the contract.
+     *
+     * @param provenanceRegistry_ The RoyalProtocol ProvenanceRegistry contract address.
+     * @param idRegistry_ The RoyalProtocol IdRegistry contract address.
+     * @param initialOwner_ The initial owner of the contract.
+     */
+    function initialize(IProvenanceRegistry provenanceRegistry_, IIdRegistry idRegistry_, address initialOwner_)
+        external;
 
     // =============================================================
     //                          REGISTRATION
@@ -191,14 +195,4 @@ interface IProvenanceGateway {
         uint256 deadline,
         bytes calldata sig
     ) external;
-
-    // =============================================================
-    //                      PERMISSIONED ACTIONS
-    // =============================================================
-
-    /// @notice Set the IdRegistry contract address.
-    function setIdRegistry(address idRegistry_) external;
-
-    /// @notice Freeze the IdRegistry dependency.
-    function freezeIdRegistry() external;
 }

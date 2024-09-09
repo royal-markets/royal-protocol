@@ -36,22 +36,14 @@ interface IMigration {
     error AlreadyMigrated();
 
     // =============================================================
-    //                          IMMUTABLES
-    // =============================================================
-
-    // Disable function name mixedcase because immutables should be uppercase.
-    /* solhint-disable func-name-mixedcase */
-    /**
-     * @notice Period in seconds after migration during which admin can continue to call protected
-     *         migration functions. Admins can make corrections to the migrated data during the
-     *         grace period if necessary, but cannot make changes after it expires.
-     */
-    function GRACE_PERIOD() external view returns (uint24);
-    /* solhint-enable func-name-mixedcase */
-
-    // =============================================================
     //                           STORAGE
     // =============================================================
+
+    /**
+     * @notice Period in seconds after migration during which admin can continue to call protected migration functions.
+     *         No migration functions can be called after the grace period passes.
+     */
+    function gracePeriod() external view returns (uint24);
 
     /**
      * @notice Migration admin address.
