@@ -93,11 +93,7 @@ contract ProvenanceRegistry is IProvenanceRegistry, Migration, Initializable, UU
         bytes32 contentHash,
         address nftContract,
         uint256 nftTokenId
-    ) public override whenNotPaused onlyProvenanceGateway returns (uint256 id) {
-        unchecked {
-            id = ++idCounter;
-        }
-
+    ) external override whenNotPaused onlyProvenanceGateway returns (uint256 id) {
         // Validate the ProvenanceClaim, reverting on invalid data
         uint256 registrarId = _validateRegister({
             originatorId: originatorId,
@@ -106,6 +102,27 @@ contract ProvenanceRegistry is IProvenanceRegistry, Migration, Initializable, UU
             nftContract: nftContract,
             nftTokenId: nftTokenId
         });
+
+        id = _unsafeRegister({
+            originatorId: originatorId,
+            registrarId: registrarId,
+            contentHash: contentHash,
+            nftContract: nftContract,
+            nftTokenId: nftTokenId
+        });
+    }
+
+    /// @dev Unsafe internal function to register a new ProvenanceClaim without validation.
+    function _unsafeRegister(
+        uint256 originatorId,
+        uint256 registrarId,
+        bytes32 contentHash,
+        address nftContract,
+        uint256 nftTokenId
+    ) internal returns (uint256 id) {
+        unchecked {
+            id = ++idCounter;
+        }
 
         // Set the provenance claim
         _provenanceClaim[id] = ProvenanceClaim({
@@ -269,11 +286,9 @@ contract ProvenanceRegistry is IProvenanceRegistry, Migration, Initializable, UU
             for (uint256 i = 0; i < length; i++) {
                 BulkRegisterData calldata d = data[i];
 
-                address registrar = idRegistry.custodyOf(d.registrarId);
-
-                register({
+                _unsafeRegister({
                     originatorId: d.originatorId,
-                    registrar: registrar,
+                    registrarId: d.registrarId,
                     contentHash: d.contentHash,
                     nftContract: d.nftContract,
                     nftTokenId: d.nftTokenId

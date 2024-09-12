@@ -396,6 +396,7 @@ contract ProvenanceGatewayTest is ProvenanceTest {
     ) public {
         // Bound inputs that need to be bound
         vm.assume(custody != address(0));
+        vm.assume(contentHash1 != contentHash2);
 
         // Register the custody as an originator, and mint the NFT to the nftOwner.
         uint256 originatorId = _register(custody, "username");

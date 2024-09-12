@@ -18,12 +18,12 @@ contract DeployRoyalProtocol is Script {
     // NOTE: Get initcode hashes from CalculateSalts script, and then salts from maldon (or create2crunch/cast).
     bytes32 idRegistrySalt = 0x694c5b53b119242271223db1d98d933bceb6d66678b2632597827ced92540255;
     bytes32 idGatewaySalt = 0x5c04a4a41ecb50ba09e6cc0ea8f9fa386da6472f459fa4e8405983201063a5ac;
-    bytes32 provenanceRegistrySalt = 0xae6820d88773a3aab8aa8896480ed88ac1b174d01f3955a1ad161e335ef42411;
+    bytes32 provenanceRegistrySalt = 0xd808620b9482d421f45fbb665f508d0cb43c6085006816061c22d56430691f33;
     bytes32 provenanceGatewaySalt = 0xa041d7c995b5cf119ca344195e34cee5d16f5da9e5850b68eb9f1c8149449576;
 
     bytes32 idRegistryProxySalt = 0x2f12417320790ce587c16f9d13ffbe7fa3b1d31f8e3856728bca4e5a00663052;
     bytes32 idGatewayProxySalt = 0xa4c0f5d2ed58ddd62d2ae7e372e00abb2549ffaa2e3500d5ffc7b543d8717d2c;
-    bytes32 provenanceRegistryProxySalt = 0xa443b9112e21b5e3f715b035d541a7b0140aa043fe6be10b908435849fc21f18;
+    bytes32 provenanceRegistryProxySalt = 0x9cffda279a73972e3960008f3863355e414a28d01b58b04b305a386bc81ce353;
     bytes32 provenanceGatewayProxySalt = 0xb96f58746c0581b1ac7c78c157ded10a92623443db30ff304a810addfc74bc56;
 
     address public constant OWNER = 0x62Bd6bD77403268E387a8c7e09aF5D3127186be8;
