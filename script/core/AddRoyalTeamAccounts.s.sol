@@ -16,8 +16,11 @@ contract AddRoyalTeamAccounts is Script {
     // NOTE: Fill in the address of the default recovery address for the Royal team.
     address ROYAL_RECOVERY = 0x06428ebF3D4A6322611792BDf674EE2600e37E29;
 
+    // TODO: Base Sepolia Recovery
+    // address ROYAL_RECOVERY = 0x1fC0226cEb49B5777a1847d2A0e6d361C336A437;
+
     // NOTE: Fill in the address of the IdRegistry.
-    IdRegistry ID_REGISTRY = IdRegistry(0x00000000F74144b0dF049137A0F9416a920F2514);
+    IdRegistry ID_REGISTRY = IdRegistry(0x0000002c243D1231dEfA58915324630AB5dBd4f4);
 
     string constant CSV_FILE = "./script/core/royal_accounts.csv";
 
@@ -38,8 +41,9 @@ contract AddRoyalTeamAccounts is Script {
 
         // 15 Royal team accounts as of 2024-07-29
         // + 1 more for friend of the team
+        // + a "royal" account.
         IIdRegistry.BulkRegisterWithDefaultRecoveryData[] memory data =
-            new IIdRegistry.BulkRegisterWithDefaultRecoveryData[](16);
+            new IIdRegistry.BulkRegisterWithDefaultRecoveryData[](17);
 
         string memory rawData = vm.readFile(CSV_FILE);
         string[] memory lines = LibString.split(rawData, "\r\n");

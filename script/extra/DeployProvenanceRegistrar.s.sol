@@ -26,8 +26,8 @@ contract DeployProvenanceRegistrar is Script {
     string constant CONTRACT_URI = "";
 
     // NOTE: Double-check these addresses are up-to-date
-    address constant ID_REGISTRY = 0x0000009ca17b183710537F72A8A7b079cdC8Abe2;
-    address constant PROVENANCE_GATEWAY = 0x000000080Bb4A34deB4FEa6479F7904CCaB93378;
+    address constant ID_REGISTRY = 0x0000002c243D1231dEfA58915324630AB5dBd4f4;
+    address constant PROVENANCE_GATEWAY = 0x000000456Bb9Fd42ADd75F4b5c2247f47D45a0A2;
 
     // NOTE: (Optional): This is the address that will be able to call `registerClaim` on the ProvenanceRegistrar.
     address registerCaller = address(0);

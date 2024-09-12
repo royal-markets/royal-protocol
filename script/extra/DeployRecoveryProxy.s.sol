@@ -15,7 +15,7 @@ contract DeployRecoveryProxy is Script {
     address public constant OWNER = address(0);
 
     // NOTE: Fill in the address of the IdRegistry.
-    address public constant ID_REGISTRY = 0x0000009ca17b183710537F72A8A7b079cdC8Abe2;
+    address public constant ID_GATEWAY = 0x000000aA0d40b46F0A78d145c321a9DcfD154Ba7;
 
     // NOTE: (Optional): Fill in this address, which is the address that will be able to call `recover` on the RecoveryProxy.
     address public constant RECOVER_CALLER = address(0);
@@ -30,8 +30,8 @@ contract DeployRecoveryProxy is Script {
             return;
         }
 
-        if (ID_REGISTRY == address(0)) {
-            console.log("ID_REGISTRY must be set");
+        if (ID_GATEWAY == address(0)) {
+            console.log("ID_GATEWAY must be set");
             return;
         }
 
@@ -43,7 +43,7 @@ contract DeployRecoveryProxy is Script {
 
         // Deploy and initialize proxy
         RecoveryProxy proxy = RecoveryProxy(LibClone.deployERC1967(address(rpImplementation)));
-        proxy.initialize(ID_REGISTRY, OWNER);
+        proxy.initialize(ID_GATEWAY, OWNER);
         console.log("RecoveryProxy (proxy) address: %s", address(proxy));
 
         // Optionally add a nonOwner address that can call the recover function
