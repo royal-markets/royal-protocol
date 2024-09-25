@@ -15,7 +15,7 @@ import {LibClone} from "solady/utils/LibClone.sol";
 // Example: Find addresses with 3 bytes of leading zeros (fairly quick).
 // cast create2 --starts-with 0x000000 --init-code-hash ${initCodeHash}
 
-contract CalculateSalts is Script {
+contract CalculateInitialSalts is Script {
     // Data used by constructors to calculate initcode hashes.
     address public constant OWNER = 0x62Bd6bD77403268E387a8c7e09aF5D3127186be8;
     address public constant MIGRATOR = 0xE5673eD07d596E558D280DACdaE346FAF9c9B1A7;

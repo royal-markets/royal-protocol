@@ -12,7 +12,10 @@ contract UpgradeProvenanceGateway is Script {
     //                          INPUTS
     // =============================================================
 
-    address ID_GATEWAY = 0x000000456Bb9Fd42ADd75F4b5c2247f47D45a0A2;
+    address PROVENANCE_GATEWAY = 0x000000456Bb9Fd42ADd75F4b5c2247f47D45a0A2;
+
+    // TODO: Fill this out to deploy an implementation address with leading 0s.
+    bytes32 provenanceGatewaySalt = 0xf0831a0056424dedfc91ad623849217e0e30e3059ae83b0db33323774f6820a6;
 
     // =============================================================
     //                          SCRIPT
@@ -22,11 +25,11 @@ contract UpgradeProvenanceGateway is Script {
         vm.startBroadcast();
 
         // Deploy new implementation
-        address newImplementation = address(new ProvenanceGateway());
+        address newImplementation = address(new ProvenanceGateway{salt: provenanceGatewaySalt}());
         console.log("New ProvenanceGateway implementation address: %s", newImplementation);
 
         // Upgrade the proxy
-        UUPSUpgradeable proxy = UUPSUpgradeable(ID_GATEWAY);
+        UUPSUpgradeable proxy = UUPSUpgradeable(PROVENANCE_GATEWAY);
         proxy.upgradeToAndCall(address(newImplementation), new bytes(0));
 
         vm.stopBroadcast();
