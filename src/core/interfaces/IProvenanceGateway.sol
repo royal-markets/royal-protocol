@@ -20,6 +20,9 @@ interface IProvenanceGateway {
     /// @dev Emitted when an NFT is assigned to an existing ProvenanceClaim without an NFT.
     event NftAssigned(uint256 indexed provenanceClaimId, address indexed nftContract, uint256 nftTokenId);
 
+    /// @dev Emitted when the RegisterFee for registering a ProvenanceClaim is updated.
+    event RegisterFeeSet(uint256 fee);
+
     // =============================================================
     //                          ERRORS
     // =============================================================
@@ -51,6 +54,9 @@ interface IProvenanceGateway {
     /// @dev Error emitted when the NFT token has already been used by a different ProvenanceClaim.
     error NftTokenAlreadyUsed();
 
+    /// @dev Revert when the msg.value is insufficient to cover the associated fee.
+    error InsufficientFee();
+
     // =============================================================
     //                           CONSTANTS
     // =============================================================
@@ -79,6 +85,9 @@ interface IProvenanceGateway {
     /// @notice The RoyalProtocol IdRegistry contract.
     function idRegistry() external view returns (IIdRegistry);
 
+    /// @notice The fee (in wei) to register a new ProvenanceClaim.
+    function registerFee() external view returns (uint256);
+
     // =============================================================
     //                        INITIALIZATION
     // =============================================================
@@ -106,6 +115,7 @@ interface IProvenanceGateway {
      * - The NFT token must be owned by the originator.
      * - The NFT token must not have been used in a ProvenanceClaim before.
      * - The registrar must have permission to register provenance on behalf of the originator.
+     * - The `msg.value` must be >= the registerFee.
      *
      * @param originatorId The RoyalProtocol ID of the originator.
      * @param contentHash The blake3 hash of the content which this ProvenanceClaim represents.
@@ -116,6 +126,7 @@ interface IProvenanceGateway {
      */
     function register(uint256 originatorId, bytes32 contentHash, address nftContract, uint256 nftTokenId)
         external
+        payable
         returns (uint256 id);
 
     /**
@@ -126,6 +137,7 @@ interface IProvenanceGateway {
      * - The caller (registrar) must have a valid RoyalProtocol ID.
      * - The NFT token must be owned by the originator.
      * - The NFT token must not have been used in a ProvenanceClaim before.
+     * - The `msg.value` must be >= the registerFee.
      *
      * NOTE: The registrar here doesn't need to be delegated on the delegateRegistry,
      *       because having an EIP712 signature is enough to prove that the registrar
@@ -147,7 +159,7 @@ interface IProvenanceGateway {
         uint256 nftTokenId,
         uint256 deadline,
         bytes calldata sig
-    ) external returns (uint256 id);
+    ) external payable returns (uint256 id);
 
     // =============================================================
     //                          ASSIGNING NFTs
@@ -167,7 +179,7 @@ interface IProvenanceGateway {
      * @param nftContract The NFT contract to associate with this ProvenanceClaim.
      * @param nftTokenId The token ID of the NFT to associate with this ProvenanceClaim.
      */
-    function assignNft(uint256 provenanceClaimId, address nftContract, uint256 nftTokenId) external;
+    function assignNft(uint256 provenanceClaimId, address nftContract, uint256 nftTokenId) external payable;
 
     /**
      * @notice Assign an NFT to an existing ProvenanceClaim without an assigned NFT.
@@ -194,5 +206,19 @@ interface IProvenanceGateway {
         uint256 nftTokenId,
         uint256 deadline,
         bytes calldata sig
-    ) external;
+    ) external payable;
+
+    // =============================================================
+    //                      FEE MANAGEMENT
+    // =============================================================
+
+    /**
+     * @notice Updates the fee to register a new ProvenanceClaim.
+     *
+     * Requirements:
+     * - Only callable by the owner.
+     *
+     * @param fee The new fee in wei to register a ProvenanceClaim.
+     */
+    function setRegisterFee(uint256 fee) external;
 }

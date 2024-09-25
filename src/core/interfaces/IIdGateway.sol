@@ -32,6 +32,24 @@ interface IIdGateway {
     /// @dev Emitted on successful recovery of an ID to another address.
     event Recovered(uint256 indexed id, address indexed to);
 
+    /// @dev Emitted when the RegisterFee for registering a RoyalProtocol account is updated.
+    event RegisterFeeSet(uint256 fee);
+
+    /// @dev Emitted when the TransferFee is updated.
+    event TransferFeeSet(uint256 fee);
+
+    /// @dev Emitted when the TransferUsernameFee is updated.
+    event TransferUsernameFeeSet(uint256 fee);
+
+    /// @dev Emitted when the ChangeUsernameFee is updated.
+    event ChangeUsernameFeeSet(uint256 fee);
+
+    /// @dev Emitted when the ChangeRecoveryFee is updated.
+    event ChangeRecoveryFeeSet(uint256 fee);
+
+    /// @dev Emitted when the RecoverFee is updated.
+    event RecoverFeeSet(uint256 fee);
+
     // =============================================================
     //                          ERRORS
     // =============================================================
@@ -47,6 +65,9 @@ interface IIdGateway {
 
     /// @dev Revert when the provided username is not url-safe. (ASCII only, no special characters, etc.)
     error UsernameContainsInvalidChar();
+
+    /// @dev Revert when the msg.value is insufficient to cover the associated fee.
+    error InsufficientFee();
 
     //
     // These errors are thrown directly by the IdRegistry, when calling IdRegistry.register().
@@ -98,6 +119,24 @@ interface IIdGateway {
     /// @notice The RoyalProtocol IdRegistry contract.
     function idRegistry() external view returns (IIdRegistry);
 
+    /// @notice The fee (in wei) to register a new RoyalProtocol account.
+    function registerFee() external view returns (uint256);
+
+    /// @notice The fee (in wei) to transfer a RoyalProtocol account to another custody address.
+    function transferFee() external view returns (uint256);
+
+    /// @notice The fee (in wei) to transfer a username to another ID.
+    function transferUsernameFee() external view returns (uint256);
+
+    /// @notice The fee (in wei) to change the username of a RoyalProtocol account.
+    function changeUsernameFee() external view returns (uint256);
+
+    /// @notice The fee (in wei) to change the recovery address of a RoyalProtocol account.
+    function changeRecoveryFee() external view returns (uint256);
+
+    /// @notice The fee (in wei) to recover a RoyalProtocol account to another custody address.
+    function recoverFee() external view returns (uint256);
+
     // =============================================================
     //                        INITIALIZATION
     // =============================================================
@@ -122,13 +161,14 @@ interface IIdGateway {
      * - The IdRegistry contract is not paused.
      * - The caller must not already have a registered ID.
      * - The provided `username` must be valid and unique.
+     * - The `msg.value` is >= the registerFee.
      *
      * @param username The username for the account, for client-side human-readable identification.
      * @param recovery The address wich can recover the account. Set to address(0) to disable recovery.
      *
      * @return id The registered account ID.
      */
-    function register(string calldata username, address recovery) external returns (uint256 id);
+    function register(string calldata username, address recovery) external payable returns (uint256 id);
 
     /**
      * @notice Register a new RoyalProtocol ID to the provided `custody` address. A signed message from the `custody` address must be provided.
@@ -138,6 +178,7 @@ interface IIdGateway {
      * - The IdRegistry contract is not paused.
      * - The `custody` address must not already have a registered ID.
      * - The provided `username` must be valid and unique.
+     * - The `msg.value` is >= the registerFee.
      * - The `deadline` must be in the future.
      * - The EIP712 signature `sig` must be valid.
      *
@@ -155,7 +196,7 @@ interface IIdGateway {
         address recovery,
         uint256 deadline,
         bytes calldata sig
-    ) external returns (uint256 id);
+    ) external payable returns (uint256 id);
 
     // =============================================================
     //                          TRANSFERS
@@ -168,7 +209,7 @@ interface IIdGateway {
      * @param deadline The deadline at which the signature expires.
      * @param sig Signature signed by the `to` address authorizing the transfer.
      */
-    function transfer(address to, uint256 deadline, bytes calldata sig) external;
+    function transfer(address to, uint256 deadline, bytes calldata sig) external payable;
 
     /**
      * @notice Transfer the provided ID to another address.
@@ -182,7 +223,7 @@ interface IIdGateway {
         bytes calldata fromSig,
         uint256 toDeadline,
         bytes calldata toSig
-    ) external;
+    ) external payable;
     /**
      * @notice Transfer the caller's ID to another address and clear the recovery address. Only callable by the IdGateway.
      *
@@ -190,7 +231,7 @@ interface IIdGateway {
      * @param deadline The deadline at which the signature expires.
      * @param sig Signature signed by the `to` address authorizing the transfer.
      */
-    function transferAndClearRecovery(address to, uint256 deadline, bytes calldata sig) external;
+    function transferAndClearRecovery(address to, uint256 deadline, bytes calldata sig) external payable;
 
     /// @notice Transfer the provided ID to another address and clear the recovery address.
     function transferAndClearRecoveryFor(
@@ -200,7 +241,7 @@ interface IIdGateway {
         bytes calldata fromSig,
         uint256 toDeadline,
         bytes calldata toSig
-    ) external;
+    ) external payable;
 
     // =============================================================
     //                       TRANSFER USERNAME
@@ -215,7 +256,8 @@ interface IIdGateway {
      * @param toSig The signature from the `to` ID.
      */
     function transferUsername(uint256 toId, string calldata newFromUsername, uint256 toDeadline, bytes calldata toSig)
-        external;
+        external
+        payable;
 
     /**
      * @notice Transfer the username of the `from` ID to the `to` ID.
@@ -236,28 +278,31 @@ interface IIdGateway {
         bytes calldata fromSig,
         uint256 toDeadline,
         bytes calldata toSig
-    ) external;
+    ) external payable;
 
     // =============================================================
     //                         CHANGE USERNAME
     // =============================================================
 
     /// @notice Change the username for the caller's ID.
-    function changeUsername(string calldata newUsername) external;
+    function changeUsername(string calldata newUsername) external payable;
 
     /// @notice Change the username for the provided ID.
     function changeUsernameFor(uint256 id, string calldata newUsername, uint256 deadline, bytes calldata sig)
-        external;
+        external
+        payable;
 
     // =============================================================
     //                       RECOVERY LOGIC
     // =============================================================
 
     /// @notice Change the recovery address for the caller's ID. Only callable by the IdGateway.
-    function changeRecovery(address newRecovery) external;
+    function changeRecovery(address newRecovery) external payable;
 
     /// @notice Change the recovery address for the provided ID.
-    function changeRecoveryFor(uint256 id, address newRecovery, uint256 deadline, bytes calldata sig) external;
+    function changeRecoveryFor(uint256 id, address newRecovery, uint256 deadline, bytes calldata sig)
+        external
+        payable;
 
     /**
      * @notice Recover the ID of the `from` address ` Only callable by the recovery address for that ID.
@@ -266,7 +311,7 @@ interface IIdGateway {
      * @param deadline The deadline at which the signature expires.
      * @param sig Signature signed by the `to` address authorizing the transfer/recovery.
      */
-    function recover(uint256 id, address to, uint256 deadline, bytes calldata sig) external;
+    function recover(uint256 id, address to, uint256 deadline, bytes calldata sig) external payable;
 
     /**
      * @notice Recover the ID of the `from` address on behalf of the ID's recovery address.
@@ -285,7 +330,7 @@ interface IIdGateway {
         bytes calldata recoverySig,
         uint256 toDeadline,
         bytes calldata toSig
-    ) external;
+    ) external payable;
 
     // =============================================================
     //                      PERMISSIONED ACTIONS
@@ -313,4 +358,30 @@ interface IIdGateway {
      * - All characters must be alphanumeric, "_" underscores, or "-" hyphens.
      */
     function checkUsername(string calldata username) external view returns (bool);
+
+    // =============================================================
+    //                      FEE MANAGEMENT
+    // =============================================================
+
+    /**
+     * @notice Updates the fees associated with RoyalProtocol account management.
+     *
+     * Requirements:
+     * - Only callable by the owner.
+     *
+     * @param registerFee_ The fee (in wei) to register a new RoyalProtocol account.
+     * @param transferFee_ The fee (in wei) to transfer a RoyalProtocol account to another custody address.
+     * @param transferUsernameFee_ The fee (in wei) to transfer a username to another ID.
+     * @param changeUsernameFee_ The fee (in wei) to change the username of a RoyalProtocol account.
+     * @param changeRecoveryFee_ The fee (in wei) to change the recovery address of a RoyalProtocol account.
+     * @param recoverFee_ The fee (in wei) to recover a RoyalProtocol account to another custody address.
+     */
+    function setFees(
+        uint256 registerFee_,
+        uint256 transferFee_,
+        uint256 transferUsernameFee_,
+        uint256 changeUsernameFee_,
+        uint256 changeRecoveryFee_,
+        uint256 recoverFee_
+    ) external;
 }

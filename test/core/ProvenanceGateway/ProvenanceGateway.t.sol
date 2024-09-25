@@ -10,6 +10,8 @@ contract ProvenanceGatewayTest is ProvenanceTest {
     //                           EVENTS
     // =============================================================
 
+    event RegisterFeeSet(uint256 registerFee);
+
     event ProvenanceRegistered(
         uint256 id, uint256 indexed originatorId, uint256 indexed registrarId, bytes32 indexed contentHash
     );
@@ -25,6 +27,7 @@ contract ProvenanceGatewayTest is ProvenanceTest {
     error NftNotOwnedByOriginator();
     error NftTokenAlreadyUsed();
     error ContentHashAlreadyRegistered();
+    error InsufficientFee();
 
     // =============================================================
     //                   Constants / Immutables
@@ -280,6 +283,80 @@ contract ProvenanceGatewayTest is ProvenanceTest {
         vm.prank(custody2);
         provenanceGateway.register(originatorId2, contentHash, nftContract, nftTokenId2);
         _assertRegisterPostconditions(expectedId2, originatorId2, originatorId2, contentHash, nftContract, nftTokenId2);
+    }
+
+    function testFuzz_register_WithNonZeroFee(address custody, bytes32 contentHash, uint64 registerFee) public {
+        // Bound inputs that need to be bound
+        vm.assume(custody != address(0));
+        vm.assume(registerFee > 0);
+
+        // Register the custody as an originator, and mint the NFT to the custody.
+        uint256 originatorId = _register(custody, "username");
+
+        // Assert preconditions.
+        address nftContract = address(0);
+        uint256 nftTokenId = 0;
+        uint256 expectedId = 1;
+        _assertRegisterPreconditions(expectedId, originatorId, contentHash, nftContract, nftTokenId);
+
+        // Set register fee
+        assertEq(provenanceGateway.registerFee(), 0);
+        vm.expectEmit();
+        emit RegisterFeeSet(registerFee);
+        vm.prank(PROVENANCE_GATEWAY_OWNER);
+        provenanceGateway.setRegisterFee(registerFee);
+        assertEq(provenanceGateway.registerFee(), registerFee);
+
+        // Give the custody some ETH to pay the fee.
+        vm.deal(custody, registerFee);
+
+        // Register the provenance claim and check the event.
+        vm.expectEmit();
+        emit ProvenanceRegistered({
+            id: expectedId,
+            originatorId: originatorId,
+            registrarId: originatorId,
+            contentHash: contentHash
+        });
+
+        vm.prank(custody);
+        provenanceGateway.register{value: registerFee}(originatorId, contentHash, nftContract, nftTokenId);
+
+        // Assert postconditions.
+        _assertRegisterPostconditions(expectedId, originatorId, originatorId, contentHash, nftContract, nftTokenId);
+    }
+
+    function testFuzz_register_RevertWhenInsufficientFee(address custody, bytes32 contentHash, uint64 registerFee)
+        public
+    {
+        // Bound inputs that need to be bound
+        vm.assume(custody != address(0));
+        vm.assume(registerFee > 0);
+
+        // Register the custody as an originator, and mint the NFT to the custody.
+        uint256 originatorId = _register(custody, "username");
+
+        // Assert preconditions.
+        address nftContract = address(0);
+        uint256 nftTokenId = 0;
+        uint256 expectedId = 1;
+        _assertRegisterPreconditions(expectedId, originatorId, contentHash, nftContract, nftTokenId);
+
+        // Set register fee
+        assertEq(provenanceGateway.registerFee(), 0);
+        vm.expectEmit();
+        emit RegisterFeeSet(registerFee);
+        vm.prank(PROVENANCE_GATEWAY_OWNER);
+        provenanceGateway.setRegisterFee(registerFee);
+        assertEq(provenanceGateway.registerFee(), registerFee);
+
+        // Give the custody some ETH to pay the fee.
+        vm.deal(custody, registerFee);
+
+        // Register the provenance claim and check the event.
+        vm.expectRevert(InsufficientFee.selector);
+        vm.prank(custody);
+        provenanceGateway.register{value: registerFee - 1}(originatorId, contentHash, nftContract, nftTokenId);
     }
 
     function testFuzz_register_RevertWhenProvenanceGatewayPaused(

@@ -71,6 +71,24 @@ contract IdGateway is IIdGateway, Withdrawable, Signatures, EIP712, Nonces, Init
     /// @inheritdoc IIdGateway
     IIdRegistry public idRegistry;
 
+    /// @inheritdoc IIdGateway
+    uint256 public registerFee;
+
+    /// @inheritdoc IIdGateway
+    uint256 public transferFee;
+
+    /// @inheritdoc IIdGateway
+    uint256 public transferUsernameFee;
+
+    /// @inheritdoc IIdGateway
+    uint256 public changeUsernameFee;
+
+    /// @inheritdoc IIdGateway
+    uint256 public changeRecoveryFee;
+
+    /// @inheritdoc IIdGateway
+    uint256 public recoverFee;
+
     // =============================================================
     //                  CONSTRUCTOR / INITIALIZATION
     // =============================================================
@@ -102,10 +120,13 @@ contract IdGateway is IIdGateway, Withdrawable, Signatures, EIP712, Nonces, Init
     /// @inheritdoc IIdGateway
     function register(string calldata username, address recovery)
         external
+        payable
         override
         whenNotPaused
         returns (uint256 id)
     {
+        if (msg.value < registerFee) revert InsufficientFee();
+
         // Validate the new username.
         _validateUsername(username);
 
@@ -120,7 +141,9 @@ contract IdGateway is IIdGateway, Withdrawable, Signatures, EIP712, Nonces, Init
         address recovery,
         uint256 deadline,
         bytes calldata sig
-    ) external override whenNotPaused returns (uint256 id) {
+    ) external payable override whenNotPaused returns (uint256 id) {
+        if (msg.value < registerFee) revert InsufficientFee();
+
         // Validate the new username.
         _validateUsername(username);
 
@@ -136,7 +159,9 @@ contract IdGateway is IIdGateway, Withdrawable, Signatures, EIP712, Nonces, Init
     // =============================================================
 
     /// @inheritdoc IIdGateway
-    function transfer(address to, uint256 deadline, bytes calldata sig) external override whenNotPaused {
+    function transfer(address to, uint256 deadline, bytes calldata sig) external payable override whenNotPaused {
+        if (msg.value < transferFee) revert InsufficientFee();
+
         uint256 id = idRegistry.getIdByAddress(msg.sender);
 
         // Reverts if the signature is invalid
@@ -154,7 +179,9 @@ contract IdGateway is IIdGateway, Withdrawable, Signatures, EIP712, Nonces, Init
         bytes calldata fromSig,
         uint256 toDeadline,
         bytes calldata toSig
-    ) external override whenNotPaused {
+    ) external payable override whenNotPaused {
+        if (msg.value < transferFee) revert InsufficientFee();
+
         address from = idRegistry.custodyOf(id);
         _verifyTransferSig({id: id, to: to, deadline: fromDeadline, signer: from, sig: fromSig});
         _verifyTransferSig({id: id, to: to, deadline: toDeadline, signer: to, sig: toSig});
@@ -165,9 +192,12 @@ contract IdGateway is IIdGateway, Withdrawable, Signatures, EIP712, Nonces, Init
     /// @inheritdoc IIdGateway
     function transferAndClearRecovery(address to, uint256 deadline, bytes calldata sig)
         external
+        payable
         override
         whenNotPaused
     {
+        if (msg.value < transferFee) revert InsufficientFee();
+
         // Get the ID of the sender.
         uint256 id = idRegistry.getIdByAddress(msg.sender);
 
@@ -186,7 +216,9 @@ contract IdGateway is IIdGateway, Withdrawable, Signatures, EIP712, Nonces, Init
         bytes calldata fromSig,
         uint256 toDeadline,
         bytes calldata toSig
-    ) external override {
+    ) external payable override {
+        if (msg.value < transferFee) revert InsufficientFee();
+
         address from = idRegistry.custodyOf(id);
         _verifyTransferSig({id: id, to: to, deadline: fromDeadline, signer: from, sig: fromSig});
         _verifyTransferSig({id: id, to: to, deadline: toDeadline, signer: to, sig: toSig});
@@ -201,9 +233,12 @@ contract IdGateway is IIdGateway, Withdrawable, Signatures, EIP712, Nonces, Init
     /// @inheritdoc IIdGateway
     function transferUsername(uint256 toId, string calldata newFromUsername, uint256 toDeadline, bytes calldata toSig)
         external
+        payable
         override
         whenNotPaused
     {
+        if (msg.value < transferUsernameFee) revert InsufficientFee();
+
         uint256 fromId = idRegistry.getIdByAddress(msg.sender);
 
         _validateUsername(newFromUsername);
@@ -224,7 +259,9 @@ contract IdGateway is IIdGateway, Withdrawable, Signatures, EIP712, Nonces, Init
         bytes calldata fromSig,
         uint256 toDeadline,
         bytes calldata toSig
-    ) external override whenNotPaused {
+    ) external payable override whenNotPaused {
+        if (msg.value < transferUsernameFee) revert InsufficientFee();
+
         // Validate the new username.
         _validateUsername(newFromUsername);
 
@@ -250,7 +287,9 @@ contract IdGateway is IIdGateway, Withdrawable, Signatures, EIP712, Nonces, Init
     // =============================================================
 
     /// @inheritdoc IIdGateway
-    function changeUsername(string calldata newUsername) external override whenNotPaused {
+    function changeUsername(string calldata newUsername) external payable override whenNotPaused {
+        if (msg.value < changeUsernameFee) revert InsufficientFee();
+
         uint256 id = idRegistry.getIdByAddress(msg.sender);
 
         _validateUsername(newUsername);
@@ -261,9 +300,12 @@ contract IdGateway is IIdGateway, Withdrawable, Signatures, EIP712, Nonces, Init
     /// @inheritdoc IIdGateway
     function changeUsernameFor(uint256 id, string calldata newUsername, uint256 deadline, bytes calldata sig)
         external
+        payable
         override
         whenNotPaused
     {
+        if (msg.value < changeUsernameFee) revert InsufficientFee();
+
         _validateUsername(newUsername);
 
         // Reverts if the signature is invalid
@@ -277,7 +319,9 @@ contract IdGateway is IIdGateway, Withdrawable, Signatures, EIP712, Nonces, Init
     // =============================================================
 
     /// @inheritdoc IIdGateway
-    function changeRecovery(address newRecovery) external override whenNotPaused {
+    function changeRecovery(address newRecovery) external payable override whenNotPaused {
+        if (msg.value < changeRecoveryFee) revert InsufficientFee();
+
         uint256 id = idRegistry.getIdByAddress(msg.sender);
 
         idRegistry.changeRecovery(id, newRecovery);
@@ -286,16 +330,26 @@ contract IdGateway is IIdGateway, Withdrawable, Signatures, EIP712, Nonces, Init
     /// @inheritdoc IIdGateway
     function changeRecoveryFor(uint256 id, address newRecovery, uint256 deadline, bytes calldata sig)
         external
+        payable
         override
         whenNotPaused
     {
+        if (msg.value < changeRecoveryFee) revert InsufficientFee();
+
         _verifyChangeRecoverySig({id: id, newRecovery: newRecovery, deadline: deadline, sig: sig});
 
         idRegistry.changeRecovery(id, newRecovery);
     }
 
     /// @inheritdoc IIdGateway
-    function recover(uint256 id, address to, uint256 deadline, bytes calldata sig) external override whenNotPaused {
+    function recover(uint256 id, address to, uint256 deadline, bytes calldata sig)
+        external
+        payable
+        override
+        whenNotPaused
+    {
+        if (msg.value < recoverFee) revert InsufficientFee();
+
         // Revert if the caller is not the recovery address
         if (idRegistry.recoveryOf(id) != msg.sender) revert OnlyRecovery();
 
@@ -312,7 +366,9 @@ contract IdGateway is IIdGateway, Withdrawable, Signatures, EIP712, Nonces, Init
         bytes calldata recoverySig,
         uint256 toDeadline,
         bytes calldata toSig
-    ) external override whenNotPaused {
+    ) external payable override whenNotPaused {
+        if (msg.value < recoverFee) revert InsufficientFee();
+
         address recovery = idRegistry.recoveryOf(id);
         _verifyRecoverSig({id: id, to: to, deadline: recoveryDeadline, signer: recovery, sig: recoverySig});
         _verifyRecoverSig({id: id, to: to, deadline: toDeadline, signer: to, sig: toSig});
@@ -465,6 +521,34 @@ contract IdGateway is IIdGateway, Withdrawable, Signatures, EIP712, Nonces, Init
         bytes32 digest = _hashTypedData(keccak256(abi.encode(RECOVER_TYPEHASH, id, to, _useNonce(signer), deadline)));
 
         _verifySig(digest, signer, deadline, sig);
+    }
+
+    // =============================================================
+    //                      FEE MANAGEMENT
+    // =============================================================
+
+    /// @inheritdoc IIdGateway
+    function setFees(
+        uint256 registerFee_,
+        uint256 transferFee_,
+        uint256 transferUsernameFee_,
+        uint256 changeUsernameFee_,
+        uint256 changeRecoveryFee_,
+        uint256 recoverFee_
+    ) external override onlyOwner {
+        registerFee = registerFee_;
+        transferFee = transferFee_;
+        transferUsernameFee = transferUsernameFee_;
+        changeUsernameFee = changeUsernameFee_;
+        changeRecoveryFee = changeRecoveryFee_;
+        recoverFee = recoverFee_;
+
+        emit RegisterFeeSet(registerFee_);
+        emit TransferFeeSet(transferFee_);
+        emit TransferUsernameFeeSet(transferUsernameFee_);
+        emit ChangeUsernameFeeSet(changeUsernameFee_);
+        emit ChangeRecoveryFeeSet(changeRecoveryFee_);
+        emit RecoverFeeSet(recoverFee_);
     }
 
     // =============================================================
