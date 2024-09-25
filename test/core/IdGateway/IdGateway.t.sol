@@ -8,6 +8,8 @@ contract IdGatewayTest is ProvenanceTest {
     //                           EVENTS
     // =============================================================
 
+    event RegisterFeeSet(uint256 registerFee);
+
     // NOTE: These events are actually emitted by IdRegistry (which IdGateway wraps).
     event Registered(uint256 id, address indexed custody, string username, address indexed recovery);
     event Transfer(address indexed from, address indexed to, uint256 indexed id);
@@ -26,6 +28,7 @@ contract IdGatewayTest is ProvenanceTest {
     error UsernameTooShort();
     error UsernameContainsInvalidChar();
     error HasNoId();
+    error InsufficientFee();
 
     // =============================================================
     //                   Constants / Immutables
@@ -147,6 +150,88 @@ contract IdGatewayTest is ProvenanceTest {
 
         // Assert Postconditions
         _assertRegisterPostconditions(expectedId, custody, username, recovery);
+    }
+
+    function testFuzz_register_WithNonZeroFee(
+        address custody,
+        uint8 usernameLength_,
+        address recovery,
+        uint64 registerFee
+    ) public {
+        // Bound inputs that need to be bound.
+        vm.assume(custody != address(0));
+        vm.assume(registerFee > 0);
+        uint256 usernameLength = _boundUsernameLength(usernameLength_);
+        string memory username = _getRandomValidUniqueUsername(usernameLength);
+
+        // Assert Preconditions
+        uint256 expectedId = 1;
+        _assertRegisterPreconditions(expectedId, custody);
+
+        // Set the fees for the register function
+        assertEq(idGateway.registerFee(), 0);
+        vm.expectEmit();
+        emit RegisterFeeSet(registerFee);
+        vm.prank(ID_GATEWAY_OWNER);
+        idGateway.setFees({
+            registerFee_: registerFee,
+            transferFee_: 0,
+            transferUsernameFee_: 0,
+            changeUsernameFee_: 0,
+            changeRecoveryFee_: 0,
+            recoverFee_: 0
+        });
+        assertEq(idGateway.registerFee(), registerFee);
+
+        // Give the custody some ETH to pay the fee
+        vm.deal(custody, registerFee);
+
+        // Call .register() and check the emitted event
+        vm.expectEmit();
+        emit Registered(expectedId, custody, username, recovery);
+        vm.prank(custody);
+        idGateway.register{value: registerFee}(username, recovery);
+
+        // Assert Postconditions
+        _assertRegisterPostconditions(expectedId, custody, username, recovery);
+    }
+
+    function testFuzz_register_RevertWhenInsufficientFee(
+        address custody,
+        uint8 usernameLength_,
+        address recovery,
+        uint64 registerFee
+    ) public {
+        // Bound inputs that need to be bound.
+        vm.assume(custody != address(0));
+        vm.assume(registerFee > 0);
+        uint256 usernameLength = _boundUsernameLength(usernameLength_);
+        string memory username = _getRandomValidUniqueUsername(usernameLength);
+
+        // Assert Preconditions
+        uint256 expectedId = 1;
+        _assertRegisterPreconditions(expectedId, custody);
+
+        // Set the fees for the register function
+        vm.expectEmit();
+        emit RegisterFeeSet(registerFee);
+        vm.prank(ID_GATEWAY_OWNER);
+        idGateway.setFees({
+            registerFee_: registerFee,
+            transferFee_: 0,
+            transferUsernameFee_: 0,
+            changeUsernameFee_: 0,
+            changeRecoveryFee_: 0,
+            recoverFee_: 0
+        });
+
+        // Give the custody some ETH to pay the fee
+        vm.deal(custody, registerFee);
+
+        // Call .register() and expect revert
+        vm.expectRevert(InsufficientFee.selector);
+        vm.prank(custody);
+        idGateway.register{value: registerFee - 1}(username, recovery);
     }
 
     function testFuzz_register_RevertWhenIdGatewayPaused(address custody, uint8 usernameLength_, address recovery)

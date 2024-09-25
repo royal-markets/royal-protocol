@@ -57,6 +57,9 @@ contract ProvenanceGateway is
     /// @inheritdoc IProvenanceGateway
     IIdRegistry public idRegistry;
 
+    /// @inheritdoc IProvenanceGateway
+    uint256 public registerFee;
+
     // =============================================================
     //                    CONSTRUCTOR / INITIALIZATION
     // =============================================================
@@ -99,10 +102,13 @@ contract ProvenanceGateway is
     /// @inheritdoc IProvenanceGateway
     function register(uint256 originatorId, bytes32 contentHash, address nftContract, uint256 nftTokenId)
         external
+        payable
         override
         whenNotPaused
         returns (uint256 id)
     {
+        if (msg.value < registerFee) revert InsufficientFee();
+
         // Check that the registrar has permission to register provenance on behalf of the originator.
         if (!idRegistry.canAct(originatorId, msg.sender, address(this), "registerProvenance")) {
             revert Unauthorized();
@@ -125,7 +131,9 @@ contract ProvenanceGateway is
         uint256 nftTokenId,
         uint256 deadline,
         bytes calldata sig
-    ) external override whenNotPaused returns (uint256 id) {
+    ) external payable override whenNotPaused returns (uint256 id) {
+        if (msg.value < registerFee) revert InsufficientFee();
+
         _verifyRegisterSig({
             originatorId: originatorId,
             contentHash: contentHash,
@@ -151,6 +159,7 @@ contract ProvenanceGateway is
     /// @inheritdoc IProvenanceGateway
     function assignNft(uint256 provenanceClaimId, address nftContract, uint256 nftTokenId)
         external
+        payable
         override
         whenNotPaused
     {
@@ -171,7 +180,7 @@ contract ProvenanceGateway is
         uint256 nftTokenId,
         uint256 deadline,
         bytes calldata sig
-    ) external override whenNotPaused {
+    ) external payable override whenNotPaused {
         _verifyAssignNftSig({
             provenanceClaimId: provenanceClaimId,
             nftContract: nftContract,
@@ -229,6 +238,17 @@ contract ProvenanceGateway is
         );
 
         _verifySig(digest, custody, deadline, sig);
+    }
+
+    // =============================================================
+    //                      FEE MANAGEMENT
+    // =============================================================
+
+    /// @inheritdoc IProvenanceGateway
+    function setRegisterFee(uint256 fee) external override onlyOwner {
+        registerFee = fee;
+
+        emit RegisterFeeSet(fee);
     }
 
     // =============================================================
