@@ -13,7 +13,10 @@ contract UpgradeProvenanceRegistrar is Script {
     // =============================================================
 
     // NOTE: Fill in the proxy address of the ProvenanceRegistrar you want to upgrade
-    address PROXY_ADDRESS = address(0);
+    address payable PROXY_ADDRESS = payable(address(0));
+
+    // NOTE: If you want to switch the NFT contract, fill in the new address here
+    address NFT_CONTRACT = address(0);
 
     // =============================================================
     //                          SCRIPT
@@ -28,7 +31,14 @@ contract UpgradeProvenanceRegistrar is Script {
 
         // Upgrade the proxy
         UUPSUpgradeable proxy = UUPSUpgradeable(PROXY_ADDRESS);
-        proxy.upgradeToAndCall(address(newImplementation), new bytes(0));
+        proxy.upgradeToAndCall(address(newImplementation), "");
+
+        ProvenanceRegistrar pr = ProvenanceRegistrar(PROXY_ADDRESS);
+
+        // Set the NFT contract
+        if (NFT_CONTRACT != address(0)) {
+            pr.setNftContract(NFT_CONTRACT);
+        }
 
         vm.stopBroadcast();
     }

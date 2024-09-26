@@ -2,12 +2,12 @@
 
 There are two main parts of the Royal Protocol - the Account System and the Provenance System.
 
-Users create accounts by registering with the `IdRegistry`. The Account system automatically assigns autoincrementing IDs to each user, but the user provides the rest of the following data in the User struct.
+Users create accounts by registering an account through the `IdGateway`. The Account system automatically assigns autoincrementing IDs to each user, but the user provides the rest of the data in the User struct:
 
 ```solidity
 /**
   * @param id       The user's ID.
-  * @param custody  The user's custody address. Controls the ID.
+  * @param custody  The user's custody address. Controls the account.
   * @param username The user's username.
   * @param recovery The user's recovery address (Optional).
   *                   Can recover the ID to another custody address.
@@ -20,9 +20,9 @@ struct User {
 }
 ```
 
-Once a user has a registered account, they can then register ProvenanceClaims - either on behalf of themselves for creative works where they were the author - or on behalf of other users (for example - a digital creative tool registering provenance claims on behalf of its users).
+Once a user has a registered account, they can then register ProvenanceClaims - either on behalf of themselves for creative works where they were the author (originator) - or on behalf of other users: for example - a digital creative tool registering works on behalf of its users.
 
-Regardless, both the originator (author of the work) and the registrar (entity registering the work) must have registered accounts in the account system.
+Regardless, both the originator (author of the work) and the registrar (entity registering the work) must have registered accounts in the Royal Protocol account system.
 
 ```solidity
 /**
@@ -36,6 +36,7 @@ Regardless, both the originator (author of the work) and the registrar (entity r
   * @param blockNumber  The block.number that this provenance claim was registered in.
   */
 struct ProvenanceClaim {
+    // uint256 id; // TODO: This is nonsense
     uint256 originatorId;
     uint256 registrarId;
     bytes32 contentHash;
@@ -45,25 +46,40 @@ struct ProvenanceClaim {
 }
 ```
 
+> NOTE: For a registrar to have permission to register ProvenanceClaims on behalf of another account, delegations need to be set up in delegate.xyz's v2 DelegateRegistry.
+
+```solidity
+// msg.sender here would be the custody address of the account you are setting up delegation from.
+// Note that you can also do this through a UI on the https://delegate.xyz/ website.
+delegateRegistry.delegateContract(
+  registrar,            // The address to delegate to.
+  provenanceGateway,    // the contract the registrar will have delegated permissions on.
+  "registerProvenance", // The specific `bytes32 rights` / permissions we are granting to the registrar.
+  true                  // `true` enables delegation.
+)
+```
+
 ## 1. Account System Contracts
 
-The account system is made up of 3 core contracts:
+The account system is made up of 2 core contracts:
 
 - IdRegistry - tracks and stores account data for Royal Protocol accounts.
-- IdGateway - wrapper for protocol account registration logic.
-- UsernameGateway - wrapper for changing usernames and username validation logic.
+- IdGateway - wrapper for protocol account creation & update logic.
 
-Additionally, the protocol considers `delegate.xyz`'s v2 DelegateRegistry to determine permissions for certain actions.
+Additionally, the protocol utilizes `delegate.xyz`'s v2 DelegateRegistry to determine permissions for certain actions: for example, whether or not a given address can:
+
+- Register a ProvenanceClaim on an originator account's behalf
+- Assign an NFT to an existing ProvenanceClaim by a given originator
 
 ### 1.1 IdRegistry
 
-The IdRegistry lets any Ethereum address claim a unique Royal Protocol ID and a unique username for that account. An Ethereum address can only be associated with one Royal Protocol ID at a time - but each Royal Protocol ID can potentially map to two different addresses.
+The IdRegistry lets any Ethereum address claim a unique Royal Protocol ID and a unique `username` for that account. An Ethereum address can only be associated with one Royal Protocol ID at a time.
 
-Each Royal Protocol ID has a `custody` address that manages the user's account data.
+- Each Royal Protocol ID has a `custody` address that manages the user's account data.
 
-Additionally, accounts can set an optional `recovery` address to allow transfering that account to another custody wallet, in case the initial custody wallet is lost.
+- Additionally, accounts can set an optional `recovery` address to allow transfering that account to another custody wallet, in case the initial custody wallet is lost.
 
-The `IdRegistry` is not upgradable - but can swap out the implementations of the `IdGateway`, `UsernameGateway`, and `DelegateRegistry` it points at.
+<!-- TODO: Add more utility functions / getters that you wrote -->
 
 #### Utility Functions
 
@@ -89,21 +105,17 @@ function usernameOf(uint256 id) external view returns (string memory);
 function recoveryOf(uint256 id) external view returns (address);
 ```
 
+<!-- TODO: Rewrite this -->
+
 ### 1.2 IdGateway
 
 The IdGateway is a thin wrapper around account registration. The IdRegistry cannot be hit directly for account registration - all account registration must go through the IdGateway.
 
 While the IdGateway just passes through the request at the moment - having an abstraction layer above account registration opens up the possibilities for future changes, like different account validation logic, without touching the core IdRegistry that holds account data.
 
-### 1.3 UsernameGateway
+<!-- TODO: Review -->
 
-The UsernameGateway is a wrapper around transferring or changing usernames. It also provides a utility function for checking if a username is valid and available - as well as containing the bulk of the logic for username validation.
-
-Of note, usernames can be forcibly transferred or changed by the contract owner - to be used in cases where usernames are grabbed solely for resale purposes or usernames associated with public figures are camped on.
-
-There's a tension between discoverability and usability of the protocol (That `@3lau` actually points to the artist 3LAU) vs decentralization of the protocol. One way we hope to address this is by decentralizing governance and contract ownership over time.
-
-### 1.4 DelegateRegistry
+### 1.3 DelegateRegistry
 
 The `delegate.xyz` DelegateRegistry is only used by one function on the IdRegistry - `canAct()`:
 
@@ -126,6 +138,8 @@ function canAct(uint256 id, address actor, address contractAddr, bytes32 rights)
 This function is used by the Provenance System to determine whether a given Ethereum address (the "actor") can take an action on behalf of some protocol account.
 
 Right now, the IdRegistry looks up delegations on the `delegate.xyz` v2 DelegateRegistry - but the contract that the IdRegistry looks at is updatable - so it is possible to deploy a custom DelegateRegistry (that adheres to the same basic interface) if more functionality is desired in the future.
+
+<!-- TODO: Review / rewrite all provenance system stuff -->
 
 ## 2. Provenance System Contracts
 
@@ -155,6 +169,7 @@ Because blockchain interactions have a deterministic ordering - anyone can deter
   * @param blockNumber The block number this provenance claim was registered in.
   */
 struct ProvenanceClaim {
+    // uint256 id => TODO ridiculous.
     uint256 originatorId;
     uint256 registrarId;
     bytes32 contentHash;

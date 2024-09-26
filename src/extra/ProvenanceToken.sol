@@ -3,11 +3,11 @@ pragma solidity ^0.8.0;
 
 import {LibString} from "solady/utils/LibString.sol";
 
-import {Withdrawable} from "../core/abstract/Withdrawable.sol";
+import {RegistrarRoles} from "./utils/RegistrarRoles.sol";
 import {ERC721} from "solady/tokens/ERC721.sol";
 
 /* solhint-disable comprehensive-interface */
-contract ProvenanceToken is Withdrawable, ERC721 {
+contract ProvenanceToken is RegistrarRoles, ERC721 {
     // =============================================================
     //                         EVENTS
     // =============================================================
@@ -23,16 +23,6 @@ contract ProvenanceToken is Withdrawable, ERC721 {
 
     /// @dev This event emits when the metadata of a range of tokens is changed. (ERC4906)
     event BatchMetadataUpdate(uint256 fromTokenId, uint256 toTokenId);
-
-    // =============================================================
-    //                        CONSTANTS
-    // =============================================================
-
-    /// @notice The bitmask for the ADMIN role.
-    uint256 public constant ADMIN = 1 << 0;
-
-    /// @notice The bitmask for the AIRDROPPER role.
-    uint256 public constant AIRDROPPER = 1 << 1;
 
     // =============================================================
     //                         STORAGE
@@ -51,7 +41,7 @@ contract ProvenanceToken is Withdrawable, ERC721 {
     string public contractURI;
 
     /// @notice The token ID of the next token to be minted.
-    uint64 public nextTokenId;
+    uint256 public nextTokenId;
 
     // =============================================================
     //                         CONSTRUCTOR
@@ -62,9 +52,11 @@ contract ProvenanceToken is Withdrawable, ERC721 {
         string memory name_,
         string memory symbol_,
         string memory metadataUrl_,
-        string memory contractURI_
+        string memory contractURI_,
+        RoleData[] memory roles
     ) {
         _initializeOwner(initialOwner_);
+        _initializeRoles(roles);
 
         // Set all the strings
         _name = name_;
@@ -112,47 +104,13 @@ contract ProvenanceToken is Withdrawable, ERC721 {
     // =============================================================
 
     /// @notice Mint a new token to the recipient. (Only callable by AIRDROPPER role or OWNER).
-    function mintTo(address recipient) external payable onlyRolesOrOwner(AIRDROPPER) returns (uint256 tokenId) {
+    function mintTo(address recipient) external whenNotPaused onlyRolesOrOwner(AIRDROPPER) returns (uint256 tokenId) {
         // Mint the token, increment the minted count, and increment the next token ID.
         tokenId = nextTokenId;
 
         unchecked {
             _mint(recipient, nextTokenId++);
         }
-    }
-
-    // =============================================================
-    //                       ROLE HELPERS
-    // =============================================================
-
-    /// @notice Add the ADMIN role to an address.
-    function addAdmin(address admin) external onlyOwner {
-        _grantRoles(admin, ADMIN);
-    }
-
-    /// @notice Remove the ADMIN role from an address.
-    function removeAdmin(address admin) external onlyOwner {
-        _removeRoles(admin, ADMIN);
-    }
-
-    /// @notice Add the AIRDROPPER role to an address.
-    function addAirdropper(address airdropper) external onlyOwner {
-        _grantRoles(airdropper, AIRDROPPER);
-    }
-
-    /// @notice Remove the AIRDROPPER role from an address.
-    function removeAirdropper(address airdropper) external onlyOwner {
-        _removeRoles(airdropper, AIRDROPPER);
-    }
-
-    /// @notice Check if an address has the ADMIN role.
-    function isAdmin(address account) external view returns (bool) {
-        return hasAnyRole(account, ADMIN);
-    }
-
-    /// @notice Check if an address has the AIRDROPPER role.
-    function isAirdropper(address account) external view returns (bool) {
-        return hasAnyRole(account, AIRDROPPER);
     }
 
     // =============================================================
@@ -175,6 +133,25 @@ contract ProvenanceToken is Withdrawable, ERC721 {
 
         // Example: https://example.com/path/to/contract/metadata/{tokenId}
         return string.concat(metadataUrl, LibString.toString(tokenId));
+    }
+
+    // =============================================================
+    //                       ROLE HELPERS
+    // =============================================================
+
+    /// @notice Check if an address has the AIRDROPPER role.
+    function isAirdropper(address account) external view returns (bool) {
+        return hasAnyRole(account, AIRDROPPER);
+    }
+
+    /// @notice Add the AIRDROPPER role to an address.
+    function addAirdropper(address account) external onlyRolesOrOwner(ADMIN) {
+        _grantRoles(account, AIRDROPPER);
+    }
+
+    /// @notice Remove the AIRDROPPER role from an address.
+    function removeAirdropper(address account) external onlyRolesOrOwner(ADMIN) {
+        _removeRoles(account, AIRDROPPER);
     }
 
     // =============================================================

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Test} from "forge-std/Test.sol";
+import {console, Test} from "forge-std/Test.sol";
 
 import {IdGateway} from "../../src/core/IdGateway.sol";
 import {IdRegistry} from "../../src/core/IdRegistry.sol";
@@ -40,8 +40,16 @@ abstract contract ProvenanceTest is Test {
     uint256 private constant _USERNAME_CHARSET_MAX_INDEX = 62;
 
     // The default address of delegate.xyz v2 on all chains.
-    IDelegateRegistry private constant _DELEGATE_REGISTRY =
-        IDelegateRegistry(0x00000000000000447e69651d841bD8D104Bed493);
+    IDelegateRegistry public constant DELEGATE_REGISTRY = IDelegateRegistry(0x00000000000000447e69651d841bD8D104Bed493);
+
+    // The canonical addresses for the protocol contracts.
+    address public constant ID_REGISTRY_ADDR = 0x0000002c243D1231dEfA58915324630AB5dBd4f4;
+    address public constant ID_GATEWAY_ADDR = 0x000000aA0d40b46F0A78d145c321a9DcfD154Ba7;
+    address public constant PROVENANCE_REGISTRY_ADDR = 0x0000009F840EeF8A92E533468A0Ef45a1987Da66;
+    address public constant PROVENANCE_GATEWAY_ADDR = 0x000000456Bb9Fd42ADd75F4b5c2247f47D45a0A2;
+
+    bytes32 internal constant _ERC1967_IMPLEMENTATION_SLOT =
+        0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
     // =============================================================
     //                         IMMUTABLES
@@ -59,9 +67,9 @@ abstract contract ProvenanceTest is Test {
     //                           STORAGE
     // =============================================================
 
+    // Protocol contract objects
     IdRegistry public idRegistry;
     IdGateway public idGateway;
-
     ProvenanceRegistry public provenanceRegistry;
     ProvenanceGateway public provenanceGateway;
 
@@ -88,27 +96,49 @@ abstract contract ProvenanceTest is Test {
 
     // Set up a fresh IdRegistry/IdGateway for each test
     function setUp() public virtual {
-        address idRegistryImplementation = address(new IdRegistry());
-        idRegistry = IdRegistry(LibClone.deployERC1967(idRegistryImplementation));
+        // Set up the IdRegistry
+        address implementation = address(new IdRegistry());
+        address proxy = LibClone.deployERC1967(implementation);
+        bytes memory proxyCode = address(proxy).code;
+        vm.etch(ID_REGISTRY_ADDR, proxyCode);
+        vm.store(ID_REGISTRY_ADDR, _ERC1967_IMPLEMENTATION_SLOT, bytes32(uint256(uint160(implementation))));
+        idRegistry = IdRegistry(ID_REGISTRY_ADDR);
         idRegistry.initialize(ID_REGISTRY_MIGRATOR, ID_REGISTRY_OWNER);
 
-        address idGatewayImplementation = address(new IdGateway());
-        idGateway = IdGateway(LibClone.deployERC1967(idGatewayImplementation));
+        // Set up the IdGateway
+        implementation = address(new IdGateway());
+        proxy = LibClone.deployERC1967(implementation);
+        proxyCode = address(proxy).code;
+        vm.etch(ID_GATEWAY_ADDR, proxyCode);
+        vm.store(ID_GATEWAY_ADDR, _ERC1967_IMPLEMENTATION_SLOT, bytes32(uint256(uint160(implementation))));
+        idGateway = IdGateway(ID_GATEWAY_ADDR);
         idGateway.initialize(idRegistry, ID_GATEWAY_OWNER);
 
+        // Point the IdRegistry at the IdGateway
         vm.startPrank(ID_REGISTRY_OWNER);
         idRegistry.setIdGateway(address(idGateway));
         idRegistry.unpause();
         vm.stopPrank();
 
-        address provenanceRegistryImplementation = address(new ProvenanceRegistry());
-        provenanceRegistry = ProvenanceRegistry(LibClone.deployERC1967(provenanceRegistryImplementation));
+        // Set up the ProvenanceRegistry
+        implementation = address(new ProvenanceRegistry());
+        proxy = LibClone.deployERC1967(implementation);
+        proxyCode = address(proxy).code;
+        vm.etch(PROVENANCE_REGISTRY_ADDR, proxyCode);
+        vm.store(PROVENANCE_REGISTRY_ADDR, _ERC1967_IMPLEMENTATION_SLOT, bytes32(uint256(uint160(implementation))));
+        provenanceRegistry = ProvenanceRegistry(PROVENANCE_REGISTRY_ADDR);
         provenanceRegistry.initialize(idRegistry, PROVENANCE_REGISTRY_MIGRATOR, PROVENANCE_REGISTRY_OWNER);
 
-        address provenanceGatewayImplementation = address(new ProvenanceGateway());
-        provenanceGateway = ProvenanceGateway(LibClone.deployERC1967(provenanceGatewayImplementation));
+        // Set up the ProvenanceGateway
+        implementation = address(new ProvenanceGateway());
+        proxy = LibClone.deployERC1967(implementation);
+        proxyCode = address(proxy).code;
+        vm.etch(PROVENANCE_GATEWAY_ADDR, proxyCode);
+        vm.store(PROVENANCE_GATEWAY_ADDR, _ERC1967_IMPLEMENTATION_SLOT, bytes32(uint256(uint160(implementation))));
+        provenanceGateway = ProvenanceGateway(PROVENANCE_GATEWAY_ADDR);
         provenanceGateway.initialize(provenanceRegistry, idRegistry, PROVENANCE_GATEWAY_OWNER);
 
+        // Point the ProvenanceRegistry at the ProvenanceGateway
         vm.startPrank(PROVENANCE_REGISTRY_OWNER);
         provenanceRegistry.setProvenanceGateway(address(provenanceGateway));
         provenanceRegistry.unpause();
@@ -117,7 +147,7 @@ abstract contract ProvenanceTest is Test {
         // Set up DelegateRegistry for delegation tests,
         // and set bytecode to the expected delegate.xyz v2 address
         DelegateRegistry delegateRegistry = new DelegateRegistry();
-        vm.etch(address(_DELEGATE_REGISTRY), address(delegateRegistry).code);
+        vm.etch(address(DELEGATE_REGISTRY), address(delegateRegistry).code);
     }
 
     // =============================================================
@@ -231,7 +261,7 @@ abstract contract ProvenanceTest is Test {
 
         if (registrar != originator) {
             vm.prank(originator);
-            _DELEGATE_REGISTRY.delegateContract(registrar, address(provenanceGateway), "registerProvenance", true);
+            DELEGATE_REGISTRY.delegateContract(registrar, address(provenanceGateway), "registerProvenance", true);
         }
 
         address nftContract = address(0);
@@ -254,7 +284,7 @@ abstract contract ProvenanceTest is Test {
 
         if (registrar != originator) {
             vm.prank(originator);
-            _DELEGATE_REGISTRY.delegateContract(registrar, address(provenanceGateway), "registerProvenance", true);
+            DELEGATE_REGISTRY.delegateContract(registrar, address(provenanceGateway), "registerProvenance", true);
         }
 
         ERC721Mock erc721 = new ERC721Mock();
@@ -275,7 +305,7 @@ abstract contract ProvenanceTest is Test {
 
         if (originatorId != registrarId) {
             vm.prank(originator);
-            _DELEGATE_REGISTRY.delegateContract(registrar, address(provenanceGateway), "registerProvenance", true);
+            DELEGATE_REGISTRY.delegateContract(registrar, address(provenanceGateway), "registerProvenance", true);
         }
 
         address nftContract = address(0);
@@ -298,7 +328,7 @@ abstract contract ProvenanceTest is Test {
 
         if (originatorId != registrarId) {
             vm.prank(originator);
-            _DELEGATE_REGISTRY.delegateContract(registrar, address(provenanceGateway), "registerProvenance", true);
+            DELEGATE_REGISTRY.delegateContract(registrar, address(provenanceGateway), "registerProvenance", true);
         }
 
         ERC721Mock erc721 = new ERC721Mock();
@@ -321,6 +351,6 @@ abstract contract ProvenanceTest is Test {
     /// @dev Delegate a username to a new address.
     function _delegateProvenanceRegistration(address delegator, address delegatee) internal {
         vm.prank(delegator);
-        _DELEGATE_REGISTRY.delegateContract(delegatee, address(provenanceGateway), "registerProvenance", true);
+        DELEGATE_REGISTRY.delegateContract(delegatee, address(provenanceGateway), "registerProvenance", true);
     }
 }

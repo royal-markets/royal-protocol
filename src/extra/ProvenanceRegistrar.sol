@@ -1,26 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {ProvenanceToken} from "./ProvenanceToken.sol";
-import {IIdRegistry} from "../core/interfaces/IIdRegistry.sol";
-import {IProvenanceGateway} from "../core/interfaces/IProvenanceGateway.sol";
-
-import {Withdrawable} from "../core/abstract/Withdrawable.sol";
+import {RegistrarRoles} from "./utils/RegistrarRoles.sol";
+import {RoyalProtocolAccount} from "./RoyalProtocolAccount.sol";
 import {Initializable} from "solady/utils/Initializable.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 
+import {SignatureCheckerLib} from "solady/utils/SignatureCheckerLib.sol";
+
+interface IProvenanceToken {
+    function mintTo(address recipient) external returns (uint256 tokenId);
+}
+
 /* solhint-disable comprehensive-interface */
-contract ProvenanceRegistrar is Withdrawable, Initializable, UUPSUpgradeable {
-    // =============================================================
-    //                          CONSTANTS
-    // =============================================================
-
-    /// @notice The bitmask for the ADMIN role.
-    uint256 public constant ADMIN = 1 << 0;
-
-    /// @notice The bitmask for the REGISTER_CALLER role.
-    uint256 public constant REGISTER_CALLER = 1 << 1;
-
+contract ProvenanceRegistrar is RegistrarRoles, RoyalProtocolAccount, Initializable, UUPSUpgradeable {
     // =============================================================
     //                           STORAGE
     // =============================================================
@@ -28,14 +21,8 @@ contract ProvenanceRegistrar is Withdrawable, Initializable, UUPSUpgradeable {
     /// @notice The address of the NFT contract to mint tokens for provenance claims.
     address public nftContract;
 
-    /// @notice The address of the RoyalProtocol IdRegistry contract.
-    address public idRegistry;
-
-    /// @notice The address of the RoyalProtocol ProvenanceGateway contract.
-    address public provenanceGateway;
-
-    /// @notice The mapping of content hashes to claim IDs to prevent double claiming.
-    mapping(bytes32 contentHash => uint256 provenanceClaimId) public provenanceClaimIdOfContentHash;
+    /// @notice An additional address that can sign ERC1271 signatures for this contract.
+    address public signer;
 
     // =============================================================
     //                           EVENTS
@@ -44,23 +31,14 @@ contract ProvenanceRegistrar is Withdrawable, Initializable, UUPSUpgradeable {
     /// @notice Emitted when the NFT contract is set.
     event NftContractSet(address indexed oldNftContract, address indexed newNftContract);
 
-    /// @notice Emitted when the IdRegistry is set.
-    event IdRegistrySet(address indexed oldIdRegistry, address indexed newIdRegistry);
+    /// @notice Emitted when the signer is set.
+    event SignerSet(address indexed oldSigner, address indexed newSigner);
 
-    /// @notice Emitted when the ProvenanceGateway is set.
-    event ProvenanceGatewaySet(address indexed oldProvenanceGateway, address indexed newProvenanceGateway);
+    /// @notice Emitted when ETH is deposited into the contract (without a corresponding function call).
+    event Received(address indexed sender, uint256 amount);
 
-    /// @notice Emitted when a ProvenanceClaim is registered on behalf of an originator.
-    event ProvenanceClaimRegistered(
-        uint256 provenanceClaimId,
-        uint256 indexed originatorId,
-        bytes32 indexed contentHash,
-        address nftContract,
-        uint256 nftTokenId
-    );
-
-    /// @notice Emitted when the contract receives ether.
-    event Received(address indexed sender, uint256 value);
+    /// @notice Emitted when an arbitrary `execute` call is made to another address.
+    event Call(address indexed caller, address indexed to, bytes data, bool success, bytes response);
 
     // =============================================================
     //                          ERRORS
@@ -68,9 +46,6 @@ contract ProvenanceRegistrar is Withdrawable, Initializable, UUPSUpgradeable {
 
     /// @notice Error when the originator is not found in the IdRegistry.
     error OriginatorNotFound();
-
-    /// @notice Error when the content hash is already claimed.
-    error ContentHashAlreadyClaimed();
 
     // =============================================================
     //                          CONSTRUCTOR
@@ -84,14 +59,24 @@ contract ProvenanceRegistrar is Withdrawable, Initializable, UUPSUpgradeable {
     //                          INITIALIZER
     // =============================================================
 
-    function initialize(address initialOwner_, address nftContract_, address idRegistry_, address provenanceGateway_)
-        external
-        initializer
-    {
+    /// @dev This is payable because initializing a protocol count _may_ require a registration fee.
+    function initialize(
+        string calldata username,
+        address recovery,
+        address initialOwner_,
+        address nftContract_,
+        RoleData[] calldata roles
+    ) external payable initializer returns (uint256 accountId) {
         _initializeOwner(initialOwner_);
+        _initializeRoles(roles);
+
         nftContract = nftContract_;
-        idRegistry = idRegistry_;
-        provenanceGateway = provenanceGateway_;
+
+        accountId = _initializeRoyalProtocolAccount({
+            username: username,
+            recovery: recovery,
+            isDuplicateClaimCheckEnabled_: true
+        });
     }
 
     // =============================================================
@@ -99,34 +84,42 @@ contract ProvenanceRegistrar is Withdrawable, Initializable, UUPSUpgradeable {
     // =============================================================
 
     /// @notice Register a provenance claim on behalf of an originator.
-    function registerProvenance(uint256 originatorId, bytes32 contentHash)
+    function registerProvenanceAndMintNft(uint256 originatorId, bytes32 contentHash)
         external
-        onlyRolesOrOwner(REGISTER_CALLER)
-        returns (uint256 provenanceId)
+        payable
+        returns (uint256 provenanceClaimId)
     {
-        address custody = IIdRegistry(idRegistry).custodyOf(originatorId);
+        // Even though the ProvenanceRegistry will do this exact same check, (that the originator is in the IdRegistry),
+        // It's nice to double-check that we mint the NFT to an actually valid custody address,
+        // rather than rely on functionality in the ProvenanceRegistry to revert for us.
+        address custody = idRegistry.custodyOf(originatorId);
         if (custody == address(0)) revert OriginatorNotFound();
 
-        uint256 existingClaimId = provenanceClaimIdOfContentHash[contentHash];
-        if (existingClaimId != 0) revert ContentHashAlreadyClaimed();
+        // Mint the NFT and register the provenance claim.
+        uint256 nftTokenId = IProvenanceToken(nftContract).mintTo(custody);
+        provenanceClaimId = registerProvenanceWithNft(originatorId, contentHash, nftContract, nftTokenId);
+    }
 
-        uint256 nftTokenId = ProvenanceToken(nftContract).mintTo(custody);
-        provenanceId =
-            IProvenanceGateway(provenanceGateway).register(originatorId, contentHash, nftContract, nftTokenId);
+    // =============================================================
+    //                     ERC1271 SIGNATURE VALIDATION
+    // =============================================================
 
-        // We assume the NFT contract and ProvenanceGateway don't re-entry, and are trusted contracts.
+    /// @notice ERC1271 signature validation for this contract.
+    ///
+    /// Check if the signature is from the owner or the `signer` address.
+    function isValidSignature(bytes32 hash, bytes calldata sig) external view override returns (bytes4 magicValue) {
+        // Validate if signature is from OWNER
+        if (SignatureCheckerLib.isValidSignatureNowCalldata(owner(), hash, sig)) {
+            return 0x1626ba7e;
+        }
 
-        // slither-disable-next-line reentrancy-no-eth
-        provenanceClaimIdOfContentHash[contentHash] = provenanceId;
+        // Validate if signature is from SIGNER
+        if (SignatureCheckerLib.isValidSignatureNowCalldata(signer, hash, sig)) {
+            return 0x1626ba7e;
+        }
 
-        // slither-disable-next-line reentrancy-events
-        emit ProvenanceClaimRegistered({
-            provenanceClaimId: provenanceId,
-            originatorId: originatorId,
-            contentHash: contentHash,
-            nftContract: nftContract,
-            nftTokenId: nftTokenId
-        });
+        // Signature validation failed.
+        return 0xffffffff;
     }
 
     // =============================================================
@@ -140,67 +133,66 @@ contract ProvenanceRegistrar is Withdrawable, Initializable, UUPSUpgradeable {
         nftContract = nftContract_;
     }
 
-    /// @notice Set the address of the IdRegistry contract.
-    function setIdRegistry(address idRegistry_) external onlyRolesOrOwner(ADMIN) {
-        emit IdRegistrySet(idRegistry, idRegistry_);
+    /// @notice Set the address of the signer.
+    function setSigner(address signer_) external onlyRolesOrOwner(ADMIN) {
+        emit SignerSet(signer, signer_);
 
-        idRegistry = idRegistry_;
+        signer = signer_;
     }
 
-    /// @notice Set the address of the ProvenanceGateway contract.
-    function setProvenanceGateway(address provenanceGateway_) external onlyRolesOrOwner(ADMIN) {
-        emit ProvenanceGatewaySet(provenanceGateway, provenanceGateway_);
+    /// @notice Arbitrary call to another contract. (only ADMIN or owner)
+    function execute(address payable to, bytes calldata data)
+        external
+        payable
+        onlyRolesOrOwner(ADMIN)
+        returns (bool, bytes memory)
+    {
+        (bool success, bytes memory response) = to.call{value: msg.value}(data);
 
-        provenanceGateway = provenanceGateway_;
+        // slither-disable-next-line reentrancy-events
+        emit Call({caller: msg.sender, to: to, data: data, success: success, response: response});
+
+        return (success, response);
     }
 
     // =============================================================
     //                       ROLE HELPERS
     // =============================================================
 
-    /// @notice Add the ADMIN role to an account.
-    function addAdmin(address account) external onlyOwner {
-        _grantRoles(account, ADMIN);
-    }
-
-    /// @notice Remove the ADMIN role from an account.
-    function removeAdmin(address account) external onlyOwner {
-        _removeRoles(account, ADMIN);
+    /// @notice Check if an account has the REGISTER_CALLER role.
+    function isRegisterCaller(address account) external view returns (bool) {
+        return hasAnyRole(account, REGISTER_CALLER);
     }
 
     /// @notice Add the REGISTER_CALLER role to an account.
-    function addRegisterCaller(address account) external onlyOwner {
+    function addRegisterCaller(address account) external onlyRolesOrOwner(ADMIN) {
         _grantRoles(account, REGISTER_CALLER);
     }
 
     /// @notice Remove the REGISTER_CALLER role from an account.
-    function removeRegisterCaller(address account) external onlyOwner {
+    function removeRegisterCaller(address account) external onlyRolesOrOwner(ADMIN) {
         _removeRoles(account, REGISTER_CALLER);
-    }
-
-    /// @notice Check if an account has the ADMIN role.
-    function isAdmin(address account) external view returns (bool) {
-        return hasAnyRole(account, ADMIN);
-    }
-
-    /// @notice Check if an account has the REGISTER_CALLER role.
-    function isRegisterCaller(address account) external view returns (bool) {
-        return hasAnyRole(account, REGISTER_CALLER);
     }
 
     // =============================================================
     //                          RECEIVE
     // =============================================================
 
+    /// @notice Fallback function to receive ETH.
     receive() external payable {
         emit Received(msg.sender, msg.value);
     }
 
     // =============================================================
-    //                          UUPS
+    //                          AUTH GUARDS
     // =============================================================
 
-    // solhint-disable-next-line no-empty-blocks
+    function _authorizeContractConfiguration() internal override onlyRolesOrOwner(ADMIN) {}
+
+    function _authorizeAccountManagement() internal override onlyRolesOrOwner(ADMIN) {}
+
+    function _authorizeProvenanceRegistration() internal override onlyRolesOrOwner(REGISTER_CALLER) whenNotPaused {}
+
     function _authorizeUpgrade(address newImplementation) internal override onlyRolesOrOwner(ADMIN) {}
 }
 /* solhint-enable comprehensive-interface */

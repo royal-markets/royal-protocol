@@ -9,8 +9,10 @@ import {ProvenanceRegistrar} from "../../src/extra/ProvenanceRegistrar.sol";
 import {LibClone} from "solady/utils/LibClone.sol";
 import {LibString} from "solady/utils/LibString.sol";
 
+import {RegistrarRoles} from "../../src/extra/utils/RegistrarRoles.sol";
+
 // NOTE: Must be called by the OWNER address
-contract DeployProvenanceRegistrar is Script {
+contract DeployProvenanceRegistrar is Script, RegistrarRoles {
     // Update these as needed:
     // =============================================================
     //                          INPUTS
@@ -19,21 +21,24 @@ contract DeployProvenanceRegistrar is Script {
     // NOTE: Fill in the address of the OWNER.
     address public constant OWNER = address(0);
 
+    // NOTE: Fill in the RoyalProtocol information:
+    string constant USERNAME = "";
+    address constant RECOVERY = address(0);
+
     // NOTE: NFT attributes for the ProvenanceToken
     string constant NAME = "";
     string constant SYMBOL = "";
     string constant METADATA_URL_BASE = "";
     string constant CONTRACT_URI = "";
 
-    // NOTE: Double-check these addresses are up-to-date
-    address constant ID_REGISTRY = 0x0000002c243D1231dEfA58915324630AB5dBd4f4;
-    address constant PROVENANCE_GATEWAY = 0x000000456Bb9Fd42ADd75F4b5c2247f47D45a0A2;
+    // NOTE: (Optional): Fill in this address, which is the address that will be able to call `recover` on the RecoveryProxy.
+    address admin = address(0);
 
     // NOTE: (Optional): This is the address that will be able to call `registerClaim` on the ProvenanceRegistrar.
     address registerCaller = address(0);
 
-    // NOTE: (Optional): Fill in this address, which is the address that will be able to call `recover` on the RecoveryProxy.
-    address admin = address(0);
+    // NOTE: (Optional): Fill in a secondary wallet/address that can sign ERC1271 signatures for this contract.
+    address signer = address(0);
 
     // =============================================================
     //                          SCRIPT
@@ -45,10 +50,33 @@ contract DeployProvenanceRegistrar is Script {
             return;
         }
 
+        if (LibString.eq(USERNAME, "")) {
+            console.log("Must set USERNAME");
+            return;
+        }
+
+        if (RECOVERY == address(0)) {
+            console.log("Should set RECOVERY");
+            return;
+        }
+
+        RoleData[] memory roles = new RoleData[](0);
+        if (admin != address(0)) {
+            roles = new RoleData[](1);
+            roles[0] = RoleData({holder: admin, roles: ADMIN});
+        }
+
+        if (registerCaller != address(0)) {
+            uint256 currentLength = roles.length;
+            roles = new RoleData[](currentLength + 1);
+            roles[currentLength] = RoleData({holder: registerCaller, roles: REGISTER_CALLER});
+        }
+
         vm.startBroadcast();
 
         // Deploy ProvenanceToken
-        ProvenanceToken provenanceToken = new ProvenanceToken(OWNER, NAME, SYMBOL, METADATA_URL_BASE, CONTRACT_URI);
+        ProvenanceToken provenanceToken =
+            new ProvenanceToken(OWNER, NAME, SYMBOL, METADATA_URL_BASE, CONTRACT_URI, roles);
         console.log("ProvenanceToken address: %s", address(provenanceToken));
 
         // Deploy ProvenanceRegistrar implementation
@@ -61,18 +89,12 @@ contract DeployProvenanceRegistrar is Script {
         console.log("ProvenanceRegistrar (proxy) address: %s", address(provenanceRegistrar));
 
         // Initialize ProvenanceRegistrar
-        provenanceRegistrar.initialize(OWNER, address(provenanceToken), ID_REGISTRY, PROVENANCE_GATEWAY);
+        provenanceRegistrar.initialize(USERNAME, RECOVERY, OWNER, address(provenanceToken), roles);
 
-        // Set up roles on contracts
+        // Set up roles that weren't included in the roles[] array.
         provenanceToken.addAirdropper(address(provenanceRegistrar));
-
-        if (registerCaller != address(0)) {
-            provenanceRegistrar.addRegisterCaller(registerCaller);
-        }
-
-        if (admin != address(0)) {
-            provenanceRegistrar.addAdmin(admin);
-            provenanceToken.addAdmin(admin);
+        if (signer != address(0)) {
+            provenanceRegistrar.setSigner(signer);
         }
 
         vm.stopBroadcast();

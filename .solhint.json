@@ -24,6 +24,7 @@
     "gas-named-return-values": "off",
     "gas-strict-inequalities": "off",
 
+    "no-empty-blocks": "off",
     "no-inline-assembly": "off",
     "not-rely-on-time": "off",
     "ordering": "off"
