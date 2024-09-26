@@ -14,7 +14,7 @@ contract UpgradeProvenanceGateway is Script {
 
     address PROVENANCE_GATEWAY = 0x000000456Bb9Fd42ADd75F4b5c2247f47D45a0A2;
 
-    // TODO: Fill this out to deploy an implementation address with leading 0s.
+    // NOTE: Fill this out to deploy an implementation address with leading 0s.
     bytes32 provenanceGatewaySalt = 0xf0831a0056424dedfc91ad623849217e0e30e3059ae83b0db33323774f6820a6;
 
     // =============================================================

@@ -16,7 +16,7 @@ contract AddRoyalTeamAccounts is Script {
     // NOTE: Fill in the address of the default recovery address for the Royal team.
     address ROYAL_RECOVERY = 0x06428ebF3D4A6322611792BDf674EE2600e37E29;
 
-    // TODO: Base Sepolia Recovery
+    // NOTE: Base Sepolia Recovery
     // address ROYAL_RECOVERY = 0x1fC0226cEb49B5777a1847d2A0e6d361C336A437;
 
     // NOTE: Fill in the address of the IdRegistry.

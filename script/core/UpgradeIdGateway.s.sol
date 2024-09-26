@@ -14,7 +14,7 @@ contract UpgradeIdGateway is Script {
 
     address ID_GATEWAY = 0x000000aA0d40b46F0A78d145c321a9DcfD154Ba7;
 
-    // TODO: Fill this out to deploy an implementation address with leading 0s.
+    // NOTE: Fill this out to deploy an implementation address with leading 0s.
     bytes32 idGatewaySalt = 0xccb16697c900cc61bec57df9a948a42abf81d068c857ee77bc81ff23c758783f;
 
     // =============================================================
