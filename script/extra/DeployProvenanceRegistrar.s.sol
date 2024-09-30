@@ -66,6 +66,7 @@ contract DeployProvenanceRegistrar is Script, RegistrarRoles {
             roles[0] = RoleData({holder: admin, roles: ADMIN});
         }
 
+        // TODO: This is bugged. We never include the `admin` role here.
         if (registerCaller != address(0)) {
             uint256 currentLength = roles.length;
             roles = new RoleData[](currentLength + 1);
@@ -74,10 +75,16 @@ contract DeployProvenanceRegistrar is Script, RegistrarRoles {
 
         vm.startBroadcast();
 
-        // Deploy ProvenanceToken
-        ProvenanceToken provenanceToken =
-            new ProvenanceToken(OWNER, NAME, SYMBOL, METADATA_URL_BASE, CONTRACT_URI, roles);
-        console.log("ProvenanceToken address: %s", address(provenanceToken));
+        // Deploy ProvenanceToken implementation
+        address ptImplementation = address(new ProvenanceToken());
+        console.log("PT Implementation address: %s", address(ptImplementation));
+
+        // Deploy Proxy for ProvenanceToken
+        ProvenanceToken provenanceToken = ProvenanceToken(LibClone.deployERC1967(address(ptImplementation)));
+        console.log("ProvenanceToken (proxy) address: %s", address(provenanceToken));
+
+        // Initialize ProvenanceToken
+        provenanceToken.initialize(OWNER, NAME, SYMBOL, METADATA_URL_BASE, CONTRACT_URI, roles);
 
         // Deploy ProvenanceRegistrar implementation
         address prImplementation = address(new ProvenanceRegistrar());

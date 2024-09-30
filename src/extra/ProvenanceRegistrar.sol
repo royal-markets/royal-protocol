@@ -18,7 +18,7 @@ contract ProvenanceRegistrar is RegistrarRoles, RoyalProtocolAccount, Initializa
     //                           STORAGE
     // =============================================================
 
-    /// @notice The address of the NFT contract to mint tokens for provenance claims.
+    /// @notice The NFT contract address to mint tokens for ProvenanceClaims.
     address public nftContract;
 
     /// @notice An additional address that can sign ERC1271 signatures for this contract.

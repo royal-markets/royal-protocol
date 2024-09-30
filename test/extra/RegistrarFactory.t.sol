@@ -54,11 +54,12 @@ contract RegistrarFactoryTest is ProvenanceTest, IRoleData {
     function setUp() public override {
         super.setUp();
 
+        address provenanceTokenImplementation = address(new ProvenanceToken());
         address provenanceRegistrarImplementation = address(new ProvenanceRegistrar());
         address registrarFactoryImplementation = address(new RegistrarFactory());
 
         registrarFactory = RegistrarFactory(LibClone.deployERC1967(registrarFactoryImplementation));
-        registrarFactory.initialize(FACTORY_OWNER, provenanceRegistrarImplementation);
+        registrarFactory.initialize(FACTORY_OWNER, provenanceRegistrarImplementation, provenanceTokenImplementation);
 
         vm.prank(FACTORY_OWNER);
         registrarFactory.addDeployCaller(FACTORY_CALLER);

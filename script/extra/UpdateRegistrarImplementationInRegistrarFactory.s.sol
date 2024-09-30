@@ -14,13 +14,13 @@ contract UpdateRegistrarImplementationInRegistrarFactory is Script {
     //                          INPUTS
     // =============================================================
 
-    bytes32 provenanceRegistrarSalt = bytes32(0xd9e15205d6cfcb423b1b59a9c5e44edd869af5300c94901c61a80e97184aaba3);
+    bytes32 provenanceRegistrarSalt = bytes32(0);
 
     // NOTE: This should be the _proxy_ address of the factory contract.
-    RegistrarFactory registrarFactory = RegistrarFactory(0x000000C0E95b5EB71f6DC4f6ce3DC31635F4794b);
+    RegistrarFactory registrarFactory = RegistrarFactory(address(0));
 
     // NOTE: Fill in the address of the OWNER.
-    address public constant OWNER = address(0x9E7F2530512D192D706480C439083BbB5F1028A7);
+    address public constant OWNER = address(0);
 
     // =============================================================
     //                          SCRIPT

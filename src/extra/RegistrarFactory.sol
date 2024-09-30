@@ -8,8 +8,6 @@ import {RegistrarRoles} from "./utils/RegistrarRoles.sol";
 import {Initializable} from "solady/utils/Initializable.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 
-import {ProvenanceToken} from "./ProvenanceToken.sol";
-
 interface IProvenanceRegistrar is IRoleData {
     function initialize(
         string calldata username,
@@ -20,6 +18,20 @@ interface IProvenanceRegistrar is IRoleData {
     ) external payable returns (uint256 accountId);
 }
 
+interface IProvenanceToken is IRoleData {
+    function initialize(
+        address initialOwner_,
+        string calldata name_,
+        string calldata symbol_,
+        string calldata metadataUrl_,
+        string calldata contractURI_,
+        RoleData[] calldata roles
+    ) external;
+
+    function addAirdropper(address account) external;
+    function transferOwnership(address newOwner) external;
+}
+
 /* solhint-disable comprehensive-interface */
 contract RegistrarFactory is RegistrarRoles, Initializable, UUPSUpgradeable {
     // =============================================================
@@ -27,10 +39,15 @@ contract RegistrarFactory is RegistrarRoles, Initializable, UUPSUpgradeable {
     // =============================================================
 
     /// @dev Emitted when a new ProvenanceRegistrar is deployed.
-    event RegistrarDeployed(uint256 accountId, address provenanceRegistrar, address provenanceToken);
+    event RegistrarDeployed(
+        uint256 indexed accountId, string username, address indexed provenanceRegistrar, address indexed provenanceToken
+    );
 
     /// @dev Emitted when the ProvenanceRegistrar implementation is updated.
     event SetProvenanceRegistrarImplementation(address oldImplementation, address newImplementation);
+
+    /// @dev Emitted when the ProvenanceToken implementation is updated.
+    event SetProvenanceTokenImplementation(address oldImplementation, address newImplementation);
 
     // =============================================================
     //                         STORAGE
@@ -38,6 +55,9 @@ contract RegistrarFactory is RegistrarRoles, Initializable, UUPSUpgradeable {
 
     /// @notice The address of the ProvenanceRegistrar implementation contract.
     address public provenanceRegistrarImplementation;
+
+    /// @notice The address of the ProvenanceToken implementation contract.
+    address public provenanceTokenImplementation;
 
     // =============================================================
     //                          CONSTRUCTOR
@@ -47,12 +67,18 @@ contract RegistrarFactory is RegistrarRoles, Initializable, UUPSUpgradeable {
         _disableInitializers();
     }
 
-    function initialize(address initialOwner_, address provenanceRegistrarImplementation_) external {
+    function initialize(
+        address initialOwner_,
+        address provenanceRegistrarImplementation_,
+        address provenanceTokenImplementation_
+    ) external {
         _initializeOwner(initialOwner_);
 
         emit SetProvenanceRegistrarImplementation(address(0), provenanceRegistrarImplementation_);
+        emit SetProvenanceTokenImplementation(address(0), provenanceTokenImplementation_);
 
         provenanceRegistrarImplementation = provenanceRegistrarImplementation_;
+        provenanceTokenImplementation = provenanceTokenImplementation_;
     }
 
     // =============================================================
@@ -73,30 +99,28 @@ contract RegistrarFactory is RegistrarRoles, Initializable, UUPSUpgradeable {
         payable
         whenNotPaused
         onlyRolesOrOwner(DEPLOY_CALLER)
-        returns (uint256 id, address payable provenanceRegistrar, address provenanceToken)
+        returns (uint256 protocolId, address payable provenanceRegistrar, address provenanceToken)
     {
         if (initialOwner_ == address(0)) revert AddressZero();
 
         // Deploy the ProvenanceToken
-        provenanceToken = address(
-            new ProvenanceToken({
-                initialOwner_: address(this),
-                name_: name_,
-                symbol_: symbol_,
-                metadataUrl_: metadataUrl_,
-                contractURI_: contractURI_,
-                roles: roles
-            })
-        );
+        provenanceToken = LibClone.deployERC1967(provenanceTokenImplementation);
+
+        // Initialize the ProvenanceToken
+        IProvenanceToken(provenanceToken).initialize({
+            initialOwner_: address(this),
+            name_: name_,
+            symbol_: symbol_,
+            metadataUrl_: metadataUrl_,
+            contractURI_: contractURI_,
+            roles: roles
+        });
 
         // Deploy the ProvenanceRegistrar
         provenanceRegistrar = payable(LibClone.deployERC1967(provenanceRegistrarImplementation));
 
-        // Emit the RegistrarDeployed event. (Emit early to avoid slither yelling about reentry nonsense).
-        emit RegistrarDeployed(id, provenanceRegistrar, provenanceToken);
-
         // Initialize the ProvenanceRegistrar
-        id = IProvenanceRegistrar(provenanceRegistrar).initialize{value: msg.value}({
+        protocolId = IProvenanceRegistrar(provenanceRegistrar).initialize{value: msg.value}({
             username: username,
             recovery: recovery,
             initialOwner_: initialOwner_,
@@ -104,13 +128,17 @@ contract RegistrarFactory is RegistrarRoles, Initializable, UUPSUpgradeable {
             roles: roles
         });
 
+        // Emit the RegistrarDeployed event.
+        // slither-disable-next-line reentrancy-events
+        emit RegistrarDeployed(protocolId, username, provenanceRegistrar, provenanceToken);
+
         // Set up the Registrar contract as an AIRDROPPER on the NFT contract,
         // then transfer ownership of the NFT contract to the initial owner.
-        ProvenanceToken(provenanceToken).addAirdropper(provenanceRegistrar);
-        ProvenanceToken(provenanceToken).transferOwnership(initialOwner_);
+        IProvenanceToken(provenanceToken).addAirdropper(provenanceRegistrar);
+        IProvenanceToken(provenanceToken).transferOwnership(initialOwner_);
 
         // Return the ID, registrar, and NFT contract address
-        return (id, provenanceRegistrar, provenanceToken);
+        return (protocolId, provenanceRegistrar, provenanceToken);
     }
 
     // =============================================================

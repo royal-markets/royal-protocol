@@ -5,9 +5,10 @@ import {LibString} from "solady/utils/LibString.sol";
 
 import {RegistrarRoles} from "./utils/RegistrarRoles.sol";
 import {ERC721} from "solady/tokens/ERC721.sol";
+import {Initializable} from "solady/utils/Initializable.sol";
 
 /* solhint-disable comprehensive-interface */
-contract ProvenanceToken is RegistrarRoles, ERC721 {
+contract ProvenanceToken is RegistrarRoles, ERC721, Initializable {
     // =============================================================
     //                         EVENTS
     // =============================================================
@@ -44,17 +45,21 @@ contract ProvenanceToken is RegistrarRoles, ERC721 {
     uint256 public nextTokenId;
 
     // =============================================================
-    //                         CONSTRUCTOR
+    //                   CONSTRUCTOR / INITIALIZER
     // =============================================================
 
-    constructor(
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
         address initialOwner_,
-        string memory name_,
-        string memory symbol_,
-        string memory metadataUrl_,
-        string memory contractURI_,
-        RoleData[] memory roles
-    ) {
+        string calldata name_,
+        string calldata symbol_,
+        string calldata metadataUrl_,
+        string calldata contractURI_,
+        RoleData[] calldata roles
+    ) external initializer {
         _initializeOwner(initialOwner_);
         _initializeRoles(roles);
 
