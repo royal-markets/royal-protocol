@@ -254,7 +254,31 @@ abstract contract RoyalProtocolAccount {
         virtual
         returns (uint256 provenanceClaimId)
     {
-        return registerProvenanceWithNft(originatorId, contentHash, address(0), 0);
+        return registerProvenanceWithNft({
+            originatorId: originatorId,
+            contentHash: contentHash,
+            nftContract: address(0),
+            nftTokenId: 0
+        });
+    }
+
+    /// @notice Register a new ProvenanceClaim without an associated NFT.
+    ///
+    /// Uses an EIP712 signature from the originator instead of assuming delegation.
+    function registerProvenanceWithoutNftFor(
+        uint256 originatorId,
+        bytes32 contentHash,
+        uint256 deadline,
+        bytes calldata sig
+    ) public payable virtual returns (uint256 provenanceClaimId) {
+        return registerProvenanceWithNftFor({
+            originatorId: originatorId,
+            contentHash: contentHash,
+            nftContract: address(0),
+            nftTokenId: 0,
+            deadline: deadline,
+            sig: sig
+        });
     }
 
     /// @notice Register a new ProvenanceClaim with an associated NFT.
@@ -271,6 +295,9 @@ abstract contract RoyalProtocolAccount {
         if (isDuplicateClaimCheckEnabled) {
             uint256 existingClaimId = provenanceClaimIdOfContentHash[contentHash];
             if (existingClaimId != 0) revert ContentHashAlreadyClaimed();
+
+            // If registration fails, the whole tx reverts - so update the mapping first.
+            provenanceClaimIdOfContentHash[contentHash] = provenanceClaimId;
         }
 
         uint256 registerFee = provenanceGateway.registerFee();
@@ -280,10 +307,54 @@ abstract contract RoyalProtocolAccount {
         provenanceClaimId =
             provenanceGateway.register{value: registerFee}(originatorId, contentHash, nftContract, nftTokenId);
 
+        // slither-disable-next-line reentrancy-events
+        emit ProvenanceClaimRegistered({
+            provenanceClaimId: provenanceClaimId,
+            originatorId: originatorId,
+            contentHash: contentHash,
+            nftContract: nftContract,
+            nftTokenId: nftTokenId
+        });
+
+        if (nftContract != address(0)) {
+            // slither-disable-next-line reentrancy-events
+            emit NftAssignedToProvenanceClaim(provenanceClaimId, nftContract, nftTokenId);
+        }
+    }
+
+    /// @notice Register a new ProvenanceClaim with an associated NFT.
+    ///
+    /// Uses an EIP712 signature from the originator instead of assuming delegation.
+    function registerProvenanceWithNftFor(
+        uint256 originatorId,
+        bytes32 contentHash,
+        address nftContract,
+        uint256 nftTokenId,
+        uint256 deadline,
+        bytes calldata sig
+    ) public payable virtual returns (uint256 provenanceClaimId) {
+        _authorizeProvenanceRegistration();
+
         if (isDuplicateClaimCheckEnabled) {
-            // slither-disable-next-line reentrancy-eth
+            uint256 existingClaimId = provenanceClaimIdOfContentHash[contentHash];
+            if (existingClaimId != 0) revert ContentHashAlreadyClaimed();
+
+            // If registration fails, the whole tx reverts - so update the mapping first.
             provenanceClaimIdOfContentHash[contentHash] = provenanceClaimId;
         }
+
+        uint256 registerFee = provenanceGateway.registerFee();
+
+        // Guarded by override of _authorizeProvenanceRegistration()
+        // slither-disable-next-line arbitrary-send-eth
+        provenanceClaimId = provenanceGateway.registerFor{value: registerFee}({
+            originatorId: originatorId,
+            contentHash: contentHash,
+            nftContract: nftContract,
+            nftTokenId: nftTokenId,
+            deadline: deadline,
+            sig: sig
+        });
 
         // slither-disable-next-line reentrancy-events
         emit ProvenanceClaimRegistered({
@@ -312,6 +383,30 @@ abstract contract RoyalProtocolAccount {
 
         // NOTE: Never a fee for assigning an NFT to an existing PC.
         provenanceGateway.assignNft(provenanceClaimId, nftContract, nftTokenId);
+    }
+
+    /// @notice Assign an NFT to an existing ProvenanceClaim.
+    ///
+    /// Uses an EIP712 signature from the originator instead of assuming delegation.
+    function assignNftToProvenanceClaimFor(
+        uint256 provenanceClaimId,
+        address nftContract,
+        uint256 nftTokenId,
+        uint256 deadline,
+        bytes calldata sig
+    ) public payable virtual {
+        _authorizeProvenanceRegistration();
+
+        emit NftAssignedToProvenanceClaim(provenanceClaimId, nftContract, nftTokenId);
+
+        // NOTE: Never a fee for assigning an NFT to an existing PC.
+        provenanceGateway.assignNftFor({
+            provenanceClaimId: provenanceClaimId,
+            nftContract: nftContract,
+            nftTokenId: nftTokenId,
+            deadline: deadline,
+            sig: sig
+        });
     }
 
     // =============================================================

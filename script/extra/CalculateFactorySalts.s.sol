@@ -19,11 +19,11 @@ contract CalculateFactorySalts is Script {
     address public constant OWNER = 0x9E7F2530512D192D706480C439083BbB5F1028A7;
 
     // Salts for sanity checking CREATE2 addresses.
-    bytes32 provenanceRegistrarSalt = bytes32(0x86c6a8afaef078040493cbdf20192d3e6085100df2e0597cd47c1576291c93fe);
+    bytes32 provenanceRegistrarSalt = bytes32(0xd9e15205d6cfcb423b1b59a9c5e44edd869af5300c94901c61a80e97184aaba3);
     bytes32 registrarFactorySalt = bytes32(0xb3891deeba58ffc8a266e1249b877e141f62807db4350a27c916278b91673ed5);
 
     // Sanity check the calculated addresses.
-    address provenanceRegistrar = address(0x0000006ba655067bEf397cfE02F62D59f036B258);
+    address provenanceRegistrar = address(0x0000005F4f59E782Ac7247F9d136552A7FFF07D7);
     address registrarFactory = address(0x00000088b59710494B0539ec09aE7D025bc10EFa);
 
     // Salts for CREATE2 proxies.
