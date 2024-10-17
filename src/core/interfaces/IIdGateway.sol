@@ -203,7 +203,7 @@ interface IIdGateway {
     // =============================================================
 
     /**
-     * @notice Transfer the caller's ID to another address. Only callable by the IdGateway.
+     * @notice Transfer the caller's ID to another address. Only callable by the custody address.
      *
      * @param to The address to transfer the ID to.
      * @param deadline The deadline at which the signature expires.
@@ -224,8 +224,9 @@ interface IIdGateway {
         uint256 toDeadline,
         bytes calldata toSig
     ) external payable;
+
     /**
-     * @notice Transfer the caller's ID to another address and clear the recovery address. Only callable by the IdGateway.
+     * @notice Transfer the caller's ID to another address and clear the recovery address. Only callable by the custody address.
      *
      * @param to The address to transfer the ID to.
      * @param deadline The deadline at which the signature expires.
@@ -296,7 +297,7 @@ interface IIdGateway {
     //                       RECOVERY LOGIC
     // =============================================================
 
-    /// @notice Change the recovery address for the caller's ID. Only callable by the IdGateway.
+    /// @notice Change the recovery address for the caller's ID. Only callable by the custody address.
     function changeRecovery(address newRecovery) external payable;
 
     /// @notice Change the recovery address for the provided ID.
