@@ -2,13 +2,29 @@
 pragma solidity ^0.8.0;
 
 import {IIdRegistry} from "./interfaces/IIdRegistry.sol";
-import {IDelegateRegistry} from "./interfaces/IDelegateRegistry.sol";
 
 import {Migration} from "./abstract/Migration.sol";
 
 import {LibString} from "solady/utils/LibString.sol";
 import {Initializable} from "solady/utils/Initializable.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
+
+interface IDelegateRegistry {
+    /**
+     * @notice Check if `to` is a delegate of `from` for the specified `contract_` or the entire wallet
+     *
+     * @param toId The delegated Royal Protocol account to check
+     * @param fromId The Royal Protocol account that issued the delegation
+     * @param contract_ The specific contract address being checked
+     * @param rights Specific rights to check for, pass the zero value to ignore subdelegations and check full delegations only
+     *
+     * @return valid Whether delegate is granted to act on from's behalf for entire wallet or that specific contract
+     */
+    function checkDelegateForContract(uint256 toId, uint256 fromId, address contract_, bytes32 rights)
+        external
+        view
+        returns (bool);
+}
 
 /**
  * @title RoyalProtocol IdRegistry
@@ -90,8 +106,8 @@ contract IdRegistry is IIdRegistry, Migration, Initializable, UUPSUpgradeable {
         _initializeOwner(initialOwner_);
         _initializeMigrator(24 hours, migrator_);
 
-        // Default to canonical address for the v2 delegate.xyz DelegateRegistry contract.
-        delegateRegistry = 0x00000000000000447e69651d841bD8D104Bed493;
+        // Default to canonical address for the RoyalProtocol DelegateRegistry contract.
+        delegateRegistry = 0x000000f1CABe81De9e020C9fac95318b14B80F14;
     }
 
     // =============================================================
@@ -389,25 +405,18 @@ contract IdRegistry is IIdRegistry, Migration, Initializable, UUPSUpgradeable {
     // =============================================================
 
     /// @inheritdoc IIdRegistry
-    ///
-    /// @dev bytes32 rights follows delegate.xyz interface. (Could be role, functionSignature, etc.)
-    function canAct(uint256 id, address actor, address contractAddr, bytes32 rights)
+    function canAct(uint256 delegatorId, uint256 actorId, address contract_, bytes32 rights)
         external
         view
         override
         returns (bool)
     {
-        // The actor must have _some_ registered ID.
-        // (which could be different than the ID they are acting on behalf of).
-        if (idOf[actor] == 0) return false;
+        // If the actor is attempting to act for itself, they can act.
+        if (delegatorId == actorId) return true;
 
-        // If the actor is the custody address, they can act.
-        address custody = custodyOf[id];
-        if (actor == custody) return true;
-
-        // If the actor is a delegate for the custody, they can act.
+        // If the actor is a delegate for the delegator, they can act.
         bool delegated =
-            IDelegateRegistry(delegateRegistry).checkDelegateForContract(actor, custody, contractAddr, rights);
+            IDelegateRegistry(delegateRegistry).checkDelegateForContract(actorId, delegatorId, contract_, rights);
         if (delegated) return true;
 
         // If none of the above, the actor cannot act for that ID.

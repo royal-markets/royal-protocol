@@ -8,17 +8,8 @@ interface IProvenanceRegistry {
     //                        STRUCTS
     // =============================================================
 
-    /**
-     * @notice A provenance claim.
-     *
-     * @param originatorId The RoyalProtocol ID of the originator. (who created the content which this ProvenanceClaim represents).
-     * @param registrarId The RoyalProtocol ID of the registrar. (who registered this ProvenanceClaim on behalf of the originator).
-     * @param contentHash The blake3 hash of the content which this ProvenanceClaim represents.
-     *
-     * @param nftContract The NFT contract of the associated NFT of this ProvenanceClaim (optional).
-     * @param nftTokenId The token ID of the NFT associated with this ProvenanceClaim (optional).
-     */
-    struct ProvenanceClaim {
+    /// @dev A ProvenanceClaim without the ID field, used internally for storage.
+    struct InternalProvenanceClaim {
         uint256 originatorId;
         uint256 registrarId;
         bytes32 contentHash;
@@ -27,7 +18,30 @@ interface IProvenanceRegistry {
         uint256 blockNumber;
     }
 
-    // @dev Struct argument for admin bulk register function, for migrating data.
+    /**
+     * @notice A provenance claim.
+     *
+     * @param id The ProvenanceClaim ID.
+     * @param originatorId The RoyalProtocol ID of the originator. (who created the content which this ProvenanceClaim represents).
+     * @param registrarId The RoyalProtocol ID of the registrar. (who registered this ProvenanceClaim on behalf of the originator).
+     * @param contentHash The blake3 hash of the content which this ProvenanceClaim represents.
+     *
+     * @param nftContract The NFT contract of the associated NFT of this ProvenanceClaim (optional).
+     * @param nftTokenId The token ID of the NFT associated with this ProvenanceClaim (optional).
+     *
+     * @param blockNumber The block number at which this ProvenanceClaim was registered.
+     */
+    struct ProvenanceClaim {
+        uint256 id;
+        uint256 originatorId;
+        uint256 registrarId;
+        bytes32 contentHash;
+        address nftContract;
+        uint256 nftTokenId;
+        uint256 blockNumber;
+    }
+
+    /// @dev Struct argument for admin bulk register function, for migrating data.
     struct BulkRegisterData {
         uint256 originatorId;
         uint256 registrarId;
@@ -140,14 +154,14 @@ interface IProvenanceRegistry {
      * - The data must be valid.
      *
      * @param originatorId The RoyalProtocol ID of the originator.
-     * @param registrar The address of the registrar.
+     * @param registrarId The RoyalProtocol ID of the registrar.
      * @param contentHash The blake3 hash of the content which this ProvenanceClaim represents.
      * @param nftContract The NFT contract of the associated NFT of this ProvenanceClaim. (Optional)
      * @param nftTokenId The token ID of the NFT associated with this ProvenanceClaim. (Optional - but required if `nftContract` is included.)
      */
     function register(
         uint256 originatorId,
-        address registrar,
+        uint256 registrarId,
         bytes32 contentHash,
         address nftContract,
         uint256 nftTokenId

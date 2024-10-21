@@ -65,8 +65,8 @@ contract IdRegistryTest is ProvenanceTest {
         assertEq(idRegistry.migrator(), ID_REGISTRY_MIGRATOR);
     }
 
-    function test_delegateRegistry_DefaultsToV2() public view {
-        address delegateRegistryV2 = 0x00000000000000447e69651d841bD8D104Bed493;
+    function test_delegateRegistry_DefaultsToProtocolDelegateRegistry() public view {
+        address delegateRegistryV2 = 0x000000f1CABe81De9e020C9fac95318b14B80F14;
         assertEq(idRegistry.delegateRegistry(), address(delegateRegistryV2));
     }
 
@@ -316,4 +316,19 @@ contract IdRegistryTest is ProvenanceTest {
     // =============================================================
     //                      canAct()
     // =============================================================
+
+    function testFuzz_canAct(address originator, address registrar, bytes32 rights) public {
+        vm.assume(originator != address(0));
+        vm.assume(originator != address(1));
+        vm.assume(registrar != address(0) && originator != registrar);
+
+        uint256 originatorId = _register(originator, "originator");
+        uint256 registrarId = _register(registrar, "registrar");
+
+        vm.prank(originator);
+        delegateRegistry.delegateContract(registrarId, address(idGateway), rights, true);
+        bool canAct = idRegistry.canAct(originatorId, registrarId, address(idGateway), rights);
+
+        assertEq(canAct, true);
+    }
 }

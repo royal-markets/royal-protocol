@@ -117,8 +117,7 @@ interface IIdRegistry {
     /**
      * @notice The address of the DelegateRegistry contract. (updatable).
      *
-     * We use this contract for the `canAct() logic to check delegations against the custody address of the ID.
-     * It MUST implement the delegate.xyz v2 interface, (and by default, is the delegate.xyz v2 contract).
+     * We use this contract for the `canAct() logic to check delegations.
      *
      * It is updatable so that we can extend / swap the functionality of `canAct()` in the future if necessary.
      */
@@ -283,16 +282,15 @@ interface IIdRegistry {
     // =============================================================
 
     /**
-     * @notice Check if an address can take a given action on behalf of an ID.
+     * @notice Check if an account can take a given action on behalf of another account.
      *
-     * NOTE: Because the logic here is based on the delegateRegistry, we can swap out
-     *       the delegateRegistry from `delegate.xyz` to our own implementation in the future,
-     *       if we ever want to update/upgrade the logic for `canAct()`.
-     *
-     * @param id The RoyalProtocol ID to check.
-     * @param actor The address attempting to take the action.
-     * @param contractAddr The address of the contract the action is being taken on.
+     * @param delegatorId The RoyalProtocol account that may have given permission to act.
+     * @param actorId The RoyalProtocol account attempting to take the action.
+     * @param contract_ The address of the contract the action is being taken on.
      * @param rights The rights being requested. (Optional).
      */
-    function canAct(uint256 id, address actor, address contractAddr, bytes32 rights) external view returns (bool);
+    function canAct(uint256 delegatorId, uint256 actorId, address contract_, bytes32 rights)
+        external
+        view
+        returns (bool);
 }

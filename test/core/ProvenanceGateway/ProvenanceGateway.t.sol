@@ -29,6 +29,8 @@ contract ProvenanceGatewayTest is ProvenanceTest {
     error ContentHashAlreadyRegistered();
     error InsufficientFee();
 
+    error ProvenanceClaimNotFound();
+
     // =============================================================
     //                   Constants / Immutables
     // =============================================================
@@ -194,7 +196,7 @@ contract ProvenanceGatewayTest is ProvenanceTest {
         address nftContract = _createMockERC721(nftContractSalt);
         ERC721Mock(nftContract).mint(custody, nftTokenId);
 
-        _delegateProvenanceRegistration(custody, registrar);
+        _delegateProvenanceRegistration(custody, registrarId);
 
         // Roll the block number forward to simulate the block number at the time of registration.
         vm.roll(blockNumber);
@@ -412,6 +414,7 @@ contract ProvenanceGatewayTest is ProvenanceTest {
     ) public {
         // Bound inputs that need to be bound
         vm.assume(custody != address(0));
+        vm.assume(originatorId != 0);
 
         // Purposely don't register the custody as an originator.
         address nftContract = _createMockERC721(nftContractSalt);
@@ -604,19 +607,14 @@ contract ProvenanceGatewayTest is ProvenanceTest {
         bytes32 contentHash,
         address nftContract,
         uint256 nftTokenId
-    ) internal view {
+    ) internal {
         assertEq(provenanceRegistry.idCounter(), 0);
 
         assertEq(provenanceRegistry.provenanceClaimIdOfNftToken(nftContract, nftTokenId), 0);
         assertEq(provenanceRegistry.provenanceClaimIdOfOriginatorAndHash(originatorId, contentHash), 0);
 
-        IProvenanceRegistry.ProvenanceClaim memory provenanceClaim = provenanceRegistry.provenanceClaim(id);
-        assertEq(provenanceClaim.originatorId, 0);
-        assertEq(provenanceClaim.registrarId, 0);
-        assertEq(provenanceClaim.contentHash, 0);
-        assertEq(provenanceClaim.nftContract, address(0));
-        assertEq(provenanceClaim.nftTokenId, 0);
-        assertEq(provenanceClaim.blockNumber, 0);
+        vm.expectRevert(ProvenanceClaimNotFound.selector);
+        provenanceRegistry.provenanceClaim(id);
     }
 
     function _assertRegisterPostconditions(
