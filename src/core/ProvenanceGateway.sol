@@ -109,14 +109,16 @@ contract ProvenanceGateway is
     {
         if (msg.value < registerFee) revert InsufficientFee();
 
+        uint256 registrarId = idRegistry.idOf(msg.sender);
+
         // Check that the registrar has permission to register provenance on behalf of the originator.
-        if (!idRegistry.canAct(originatorId, msg.sender, address(this), "registerProvenance")) {
+        if (!idRegistry.canAct(originatorId, registrarId, address(this), "registerProvenance")) {
             revert Unauthorized();
         }
 
         id = provenanceRegistry.register({
             originatorId: originatorId,
-            registrar: msg.sender,
+            registrarId: registrarId,
             contentHash: contentHash,
             nftContract: nftContract,
             nftTokenId: nftTokenId
@@ -134,6 +136,8 @@ contract ProvenanceGateway is
     ) external payable override whenNotPaused returns (uint256 id) {
         if (msg.value < registerFee) revert InsufficientFee();
 
+        uint256 registrarId = idRegistry.idOf(msg.sender);
+
         _verifyRegisterSig({
             originatorId: originatorId,
             contentHash: contentHash,
@@ -145,7 +149,7 @@ contract ProvenanceGateway is
 
         id = provenanceRegistry.register({
             originatorId: originatorId,
-            registrar: msg.sender,
+            registrarId: registrarId,
             contentHash: contentHash,
             nftContract: nftContract,
             nftTokenId: nftTokenId
@@ -164,9 +168,10 @@ contract ProvenanceGateway is
         whenNotPaused
     {
         uint256 originatorId = provenanceRegistry.provenanceClaim(provenanceClaimId).originatorId;
+        uint256 registrarId = idRegistry.idOf(msg.sender);
 
         // Check that the assigner has permission to assign an NFT to a ProvenanceClaim on behalf of the originator.
-        if (!idRegistry.canAct(originatorId, msg.sender, address(this), "assignNft")) {
+        if (!idRegistry.canAct(originatorId, registrarId, address(this), "assignNft")) {
             revert Unauthorized();
         }
 

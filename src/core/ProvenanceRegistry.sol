@@ -44,7 +44,7 @@ contract ProvenanceRegistry is IProvenanceRegistry, Migration, Initializable, UU
     /// @dev Internal lookup for ProvenanceClaim by ID.
     ///
     /// NOTE: We have a separate helper method to read this externally so we can actually return a struct.
-    mapping(uint256 claimId => ProvenanceClaim claim) internal _provenanceClaim;
+    mapping(uint256 claimId => InternalProvenanceClaim claim) internal _provenanceClaim;
 
     // =============================================================
     //                          MODIFIERS
@@ -89,15 +89,15 @@ contract ProvenanceRegistry is IProvenanceRegistry, Migration, Initializable, UU
     /// @inheritdoc IProvenanceRegistry
     function register(
         uint256 originatorId,
-        address registrar,
+        uint256 registrarId,
         bytes32 contentHash,
         address nftContract,
         uint256 nftTokenId
     ) external override whenNotPaused onlyProvenanceGateway returns (uint256 id) {
         // Validate the ProvenanceClaim, reverting on invalid data
-        uint256 registrarId = _validateRegister({
+        _validateRegister({
             originatorId: originatorId,
-            registrar: registrar,
+            registrarId: registrarId,
             contentHash: contentHash,
             nftContract: nftContract,
             nftTokenId: nftTokenId
@@ -125,7 +125,7 @@ contract ProvenanceRegistry is IProvenanceRegistry, Migration, Initializable, UU
         }
 
         // Set the provenance claim
-        _provenanceClaim[id] = ProvenanceClaim({
+        _provenanceClaim[id] = InternalProvenanceClaim({
             originatorId: originatorId,
             registrarId: registrarId,
             contentHash: contentHash,
@@ -167,7 +167,7 @@ contract ProvenanceRegistry is IProvenanceRegistry, Migration, Initializable, UU
         _validateAssignNft(provenanceClaimId, nftContract, nftTokenId);
 
         // Get the existing provenance claim
-        ProvenanceClaim storage pc = _provenanceClaim[provenanceClaimId];
+        InternalProvenanceClaim storage pc = _provenanceClaim[provenanceClaimId];
 
         // Set the provenance claim NFT data
         pc.nftContract = nftContract;
@@ -206,17 +206,14 @@ contract ProvenanceRegistry is IProvenanceRegistry, Migration, Initializable, UU
      */
     function _validateRegister(
         uint256 originatorId,
-        address registrar,
+        uint256 registrarId,
         bytes32 contentHash,
         address nftContract,
         uint256 nftTokenId
-    ) internal view returns (uint256 registrarId) {
-        // Check that the originator exists in the ID_REGISTRY
+    ) internal view {
+        // Check that the accounts exists in the ID_REGISTRY
         if (idRegistry.custodyOf(originatorId) == address(0)) revert OriginatorDoesNotExist();
-
-        // Check that the registrar exists in the ID_REGISTRY
-        registrarId = idRegistry.idOf(registrar);
-        if (registrarId == 0) revert RegistrarDoesNotExist();
+        if (idRegistry.custodyOf(registrarId) == address(0)) revert RegistrarDoesNotExist();
 
         // Check that the originator has not already registered this contentHash previously.
         if (provenanceClaimIdOfOriginatorAndHash[originatorId][contentHash] > 0) {
@@ -302,9 +299,19 @@ contract ProvenanceRegistry is IProvenanceRegistry, Migration, Initializable, UU
     // =============================================================
 
     /// @inheritdoc IProvenanceRegistry
-    function provenanceClaim(uint256 id) external view override returns (ProvenanceClaim memory) {
-        if (id == 0) revert ProvenanceClaimNotFound();
-        return _provenanceClaim[id];
+    function provenanceClaim(uint256 id) public view override returns (ProvenanceClaim memory) {
+        if (id == 0 || id > idCounter) revert ProvenanceClaimNotFound();
+
+        InternalProvenanceClaim memory pc = _provenanceClaim[id];
+        return ProvenanceClaim({
+            id: id,
+            originatorId: pc.originatorId,
+            registrarId: pc.registrarId,
+            contentHash: pc.contentHash,
+            nftContract: pc.nftContract,
+            nftTokenId: pc.nftTokenId,
+            blockNumber: pc.blockNumber
+        });
     }
 
     /// @inheritdoc IProvenanceRegistry
@@ -315,9 +322,7 @@ contract ProvenanceRegistry is IProvenanceRegistry, Migration, Initializable, UU
         returns (ProvenanceClaim memory)
     {
         uint256 id = provenanceClaimIdOfOriginatorAndHash[originatorId][contentHash];
-
-        if (id == 0) revert ProvenanceClaimNotFound();
-        return _provenanceClaim[id];
+        return provenanceClaim(id);
     }
 
     /// @inheritdoc IProvenanceRegistry
@@ -328,9 +333,7 @@ contract ProvenanceRegistry is IProvenanceRegistry, Migration, Initializable, UU
         returns (ProvenanceClaim memory)
     {
         uint256 id = provenanceClaimIdOfNftToken[nftContract][nftTokenId];
-
-        if (id == 0) revert ProvenanceClaimNotFound();
-        return _provenanceClaim[id];
+        return provenanceClaim(id);
     }
 
     // =============================================================

@@ -160,7 +160,7 @@ contract RegistrarFactoryTest is ProvenanceTest, IRoleData {
         // Register custody account and set up delegation to registrar contract
         uint256 originatorId = _register(custody, "user");
         vm.prank(custody);
-        DELEGATE_REGISTRY.delegateContract(registrar, address(provenanceGateway), "registerProvenance", true);
+        delegateRegistry.delegateContract(registrarId, address(provenanceGateway), "registerProvenance", true);
 
         // Attempt to register provenance
         vm.prank(registerCaller);
