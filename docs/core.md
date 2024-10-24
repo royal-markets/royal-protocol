@@ -50,7 +50,7 @@ struct ProvenanceClaim {
 > NOTE: For a registrar to have permission to register a `ProvenanceClaim` on behalf of another account, that account needs to delegate permission.
 > There are two ways to do so:
 >
-> - Set up delegations in [delegate.xyz](https://delegate.xyz/)'s v2 [`DelegateRegistry`](https://github.com/delegatexyz/delegate-registry).
+> - Set up delegations in [`DelegateRegistry`](../src/core/delegation/DelegateRegistry.sol).
 > - Sign an [EIP712 message](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-712.md) granting permission to a registrar to register a single `ProvenanceClaim` on their behalf for that particular hash.
 
 > This is an example of the call that authorizes a registrar to act on behalf of an author.
@@ -82,39 +82,39 @@ Accounts can also set an optional `recovery` address to allow transfering that a
 
 #### DelegateRegistry usage
 
-The [delegate.xyz](https://delegate.xyz/) [`DelegateRegistry`](https://github.com/delegatexyz/delegate-registry) is only used by one function on `IdRegistry`, `canAct()`.
+The [`DelegateRegistry`](../src/core/delegation/DelegateRegistry.sol) is only used by one function on `IdRegistry`, `canAct()`.
 
 ```solidity
 /**
-  * @notice Check if an address can take a given action on behalf of an ID.
+  * @notice Check if an account can take a given action on behalf of another account.
   *
-  * NOTE: Because the logic here is based on the delegateRegistry, we can swap out
-  *       the delegateRegistry from `delegate.xyz` to our own implementation in the future,
-  *       if we ever want to update/upgrade the logic for `canAct()`.
-  *
-  * @param id The RoyalProtocol ID to check.
-  * @param actor The address attempting to take the action.
-  * @param contractAddr The address of the contract the action is being taken on.
+  * @param delegatorId The RoyalProtocol account that may have given permission to act.
+  * @param actorId The RoyalProtocol account attempting to take the action.
+  * @param contract_ The address of the contract the action is being taken on.
   * @param rights The rights being requested. (Optional).
   */
-function canAct(uint256 id, address actor, address contractAddr, bytes32 rights) external view returns (bool);
+function canAct(uint256 delegatorId, uint256 actorId, address contract_, bytes32 rights)
+    external
+    view
+    returns (bool);
 ```
 
-This function is used by the Provenance System to determine whether a given Ethereum address (the "actor") can take an action on behalf of some protocol account.
+This function is used by the Provenance System to determine whether a given Royal ID (the "actorId") can take an action on behalf of some protocol account.
 
 The two actions that delegations are possible for right now are registering a `ProvenanceClaim`, or attaching an NFT to an existing `ProvenanceClaim` that does not yet have an attached NFT.
 
-> NOTE: In the following examples, `msg.sender` is the `registrar`, which could be the custody address of the `originatorId` (a self-registration), or could be the custody address of some other protocol account (which would require delegation from the originator).
+> NOTE: In the following examples, `registrarId` is the `registrar`, which could be the custody address of the `originatorId` (a self-registration), or could be the custody address of some other protocol account (which would require delegation from the originator).
 
 ```solidity
         // Check that the registrar has permission to register provenance on behalf of the originator.
-        idRegistry.canAct(originatorId, msg.sender, provenanceGateway, "registerProvenance")
+        idRegistry.canAct(originatorId, registrarId, provenanceGateway, "registerProvenance")
 
         // Check that the assigner has permission to assign an NFT to a ProvenanceClaim on behalf of the originator.
-        idRegistry.canAct(originatorId, msg.sender, provenanceGateway, "assignNft")
+        idRegistry.canAct(originatorId, registrarId, provenanceGateway, "assignNft")
 ```
 
-Right now, the `IdRegistry` looks up delegations on the `delegate.xyz` v2 DelegateRegistry. But the contract address that `IdRegistry` uses to determine delegation at is updatable. 
+Right now, the `IdRegistry` looks up delegations on the [`DelegateRegistry`](../src/core/delegation/DelegateRegistry.sol). 
+But the contract address that `IdRegistry` uses to determine delegation at is updatable. 
 This gives the protocol the possibility to expand or change delegation logic moving forward.
 
 #### Utility Functions

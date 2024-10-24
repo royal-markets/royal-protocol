@@ -98,7 +98,7 @@ interface IDelegateRegistry {
     function delegateAll(uint256 toId, bytes32 rights, bool enable) external payable returns (bytes32 delegationHash);
 
     /**
-     * @notice Allow the delegate to act on behalf of the Royal Protocol ID of `msg.sender` for all contracts
+     * @notice Allow the delegate to act on behalf of the Royal Protocol ID of the signer for all contracts
      * @param fromId The Royal Protocol ID to act as delegator
      * @param toId The Royal Protocol ID to act as delegate
      * @param rights Specific subdelegation rights granted to the delegate, pass an empty bytestring to encompass all rights
@@ -119,7 +119,7 @@ interface IDelegateRegistry {
     /**
      * @notice Allow the delegate to act on behalf of the Royal Protocol ID of `msg.sender` for a specific contract
      * @param toId The Royal Protocol ID to act as delegate
-     * @param contract_ The contract whose rights are being delegated
+     * @param contract_ The contract on which rights are being delegated
      * @param rights Specific subdelegation rights granted to the delegate, pass an empty bytestring to encompass all rights
      * @param enable Whether to enable or disable this delegation, true delegates and false revokes
      * @return delegationHash The unique identifier of the delegation
@@ -130,10 +130,10 @@ interface IDelegateRegistry {
         returns (bytes32 delegationHash);
 
     /**
-     * @notice Allow the delegate to act on behalf of the Royal Protocol ID of `msg.sender` for a specific contract
+     * @notice Allow the delegate to act on behalf of the Royal Protocol ID of the signer for a specific contract
      * @param fromId The Royal Protocol ID to act as delegator
      * @param toId The Royal Protocol ID to act as delegate
-     * @param contract_ The contract whose rights are being delegated
+     * @param contract_ The contract on which rights are being delegated
      * @param rights Specific subdelegation rights granted to the delegate, pass an empty bytestring to encompass all rights
      * @param enable Whether to enable or disable this delegation, true delegates and false revokes
      * @param deadline The deadline for the signature to be valid
@@ -165,7 +165,7 @@ interface IDelegateRegistry {
         returns (bytes32 delegationHash);
 
     /**
-     * @notice Allow the delegate to act on behalf of the Royal Protocol ID of `msg.sender` for a specific ERC721 token
+     * @notice Allow the delegate to act on behalf of the Royal Protocol ID of the signer for a specific ERC721 token
      * @param fromId The Royal Protocol ID to act as delegator
      * @param toId The Royal Protocol ID to act as delegate
      * @param contract_ The contract whose rights are being delegated
@@ -202,7 +202,7 @@ interface IDelegateRegistry {
         returns (bytes32 delegationHash);
 
     /**
-     * @notice Allow the delegate to act on behalf of the Royal Protocol ID of `msg.sender` for a specific amount of ERC20 tokens
+     * @notice Allow the delegate to act on behalf of the Royal Protocol ID of the signer for a specific amount of ERC20 tokens
      * @dev The actual amount is not encoded in the hash, just the existence of a amount (since it is an upper bound)
      * @param fromId The Royal Protocol ID to act as delegator
      * @param toId The Royal Protocol ID to act as delegate
@@ -239,7 +239,7 @@ interface IDelegateRegistry {
         returns (bytes32 delegationHash);
 
     /**
-     * @notice Allow the delegate to act on behalf of the Royal Protocol ID of `msg.sender` for a specific amount of ERC1155 tokens
+     * @notice Allow the delegate to act on behalf of the Royal Protocol ID of the signer for a specific amount of ERC1155 tokens
      * @dev The actual amount is not encoded in the hash, just the existence of a amount (since it is an upper bound)
      * @param fromId The Royal Protocol ID to act as delegator
      * @param toId The Royal Protocol ID to act as delegate
@@ -267,7 +267,7 @@ interface IDelegateRegistry {
      */
 
     /**
-     * @notice Check if `to` is a delegate of `from` for the entire wallet
+     * @notice Check if `to` is a delegate of `from` for all contracts
      * @param toId The delegated Royal Protocol account to check
      * @param fromId The Royal Protocol account that issued the delegation
      * @param rights Specific rights to check for, pass the zero value to ignore subdelegations and check full delegations only
@@ -276,7 +276,7 @@ interface IDelegateRegistry {
     function checkDelegateForAll(uint256 toId, uint256 fromId, bytes32 rights) external view returns (bool);
 
     /**
-     * @notice Check if `to` is a delegate of `from` for the specified `contract_` or the entire wallet
+     * @notice Check if `to` is a delegate of `from` for the specified `contract_` or all contracts
      * @param toId The delegated Royal Protocol account to check
      * @param fromId The Royal Protocol account that issued the delegation
      * @param contract_ The specific contract address being checked
@@ -289,7 +289,7 @@ interface IDelegateRegistry {
         returns (bool);
 
     /**
-     * @notice Check if `to` is a delegate of `from` for the specific `contract` and `tokenId`, the entire `contract_`, or the entire wallet
+     * @notice Check if `to` is a delegate of `from` for the specific `contract` and `tokenId`, the entire `contract_`, or all contracts
      * @param toId The delegated Royal Protocol account to check
      * @param fromId The Royal Protocol account that issued the delegation
      * @param contract_ The specific contract address being checked
@@ -303,7 +303,7 @@ interface IDelegateRegistry {
         returns (bool);
 
     /**
-     * @notice Returns the amount of ERC20 tokens the delegate is granted rights to act on the behalf of
+     * @notice Returns the amount of ERC20 tokens the delegate is granted rights to act upon on behalf of fromId
      * @param toId The delegated Royal Protocol account to check
      * @param fromId The Royal Protocol account that issued the delegation
      * @param contract_ The address of the token contract
@@ -316,7 +316,7 @@ interface IDelegateRegistry {
         returns (uint256);
 
     /**
-     * @notice Returns the amount of a ERC1155 tokens the delegate is granted rights to act on the behalf of
+     * @notice Returns the amount of a ERC1155 tokens the delegate is granted rights to act upon on behalf of fromId
      * @param toId The delegated Royal Protocol account to check
      * @param fromId The Royal Protocol account that issued the delegation
      * @param contract_ The address of the token contract
