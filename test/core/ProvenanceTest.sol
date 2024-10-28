@@ -116,6 +116,8 @@ abstract contract ProvenanceTest is Test {
         vm.store(ID_GATEWAY_ADDR, _ERC1967_IMPLEMENTATION_SLOT, bytes32(uint256(uint160(implementation))));
         idGateway = IdGateway(ID_GATEWAY_ADDR);
         idGateway.initialize(idRegistry, ID_GATEWAY_OWNER);
+        vm.prank(ID_GATEWAY_OWNER);
+        idGateway.setDelegateRegistry(DELEGATE_REGISTRY_ADDR);
 
         // Point the IdRegistry at the IdGateway
         vm.startPrank(ID_REGISTRY_OWNER);
@@ -158,6 +160,8 @@ abstract contract ProvenanceTest is Test {
         );
         delegateRegistry = DelegateRegistry(DELEGATE_REGISTRY_ADDR);
         delegateRegistry.initialize(address(idRegistry), DELEGATE_REGISTRY_OWNER);
+        vm.prank(DELEGATE_REGISTRY_OWNER);
+        delegateRegistry.setIdGateway(ID_GATEWAY_ADDR);
     }
 
     // =============================================================

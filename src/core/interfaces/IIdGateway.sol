@@ -50,6 +50,9 @@ interface IIdGateway {
     /// @dev Emitted when the RecoverFee is updated.
     event RecoverFeeSet(uint256 fee);
 
+    /// @dev Emitted when the DelegateRegistry address is updated.
+    event DelegateRegistrySet(address indexed oldDelegateRegistry, address indexed newDelegateRegistry);
+
     // =============================================================
     //                          ERRORS
     // =============================================================
@@ -82,6 +85,13 @@ interface IIdGateway {
     /// @dev Revert when the relevant username/ID does not exist.
     error HasNoId();
 
+    //
+    // These errors are thrown directly by the DelegateRegistry, when calling DelegateRegistry.delegateAllDuringRegistration().
+    //
+
+    /// @notice Thrown if the delegatee does not exist
+    error DelegateeDoesNotExist();
+
     // =============================================================
     //                           CONSTANTS
     // =============================================================
@@ -94,6 +104,9 @@ interface IIdGateway {
 
     /// @notice EIP712 typehash for Register signatures.
     function REGISTER_TYPEHASH() external view returns (bytes32);
+
+    /// @notice EIP712 typehash for RegisterAndDelegate signatures.
+    function REGISTER_AND_DELEGATE_TYPEHASH() external view returns (bytes32);
 
     /// @notice The EIP712 typehash for Transfer signatures.
     function TRANSFER_TYPEHASH() external view returns (bytes32);
@@ -118,6 +131,9 @@ interface IIdGateway {
 
     /// @notice The RoyalProtocol IdRegistry contract.
     function idRegistry() external view returns (IIdRegistry);
+
+    /// @notice The RoyalProtocol DelegateRegistry contract.
+    function delegateRegistry() external view returns (address);
 
     /// @notice The fee (in wei) to register a new RoyalProtocol account.
     function registerFee() external view returns (uint256);
@@ -194,6 +210,56 @@ interface IIdGateway {
         address custody,
         string calldata username,
         address recovery,
+        uint256 deadline,
+        bytes calldata sig
+    ) external payable returns (uint256 id);
+
+    /**
+     * @notice Register a new RoyalProtocol ID to the caller and delegate permissions to another ID.
+     *
+     * Requirements:
+     * - The IdGateway contract is not paused.
+     * - The IdRegistry contract is not paused.
+     * - The custody address must not already have a registered ID.
+     * - The provided `username` must be valid and unique.
+     * - The `delegateeId` must exist.
+     * - The `msg.value` is >= the registerFee.
+     *
+     * @param username The username for the account, for client-side human-readable identification.
+     * @param recovery The address wich can recover the account. Set to address(0) to disable recovery.
+     * @param delegateeId The ID to delegate the new ID to.
+     */
+    function registerAndDelegate(string calldata username, address recovery, uint256 delegateeId)
+        external
+        payable
+        returns (uint256 id);
+
+    /**
+     * @notice Register a new RoyalProtocol ID to the provided `custody` address. A signed message from the `custody` address must be provided.
+     *
+     * Requirements:
+     * - The IdGateway contract is not paused.
+     * - The IdRegistry contract is not paused.
+     * - The `custody` address must not already have a registered ID.
+     * - The provided `username` must be valid and unique.
+     * - The `delegateeId` must exist.
+     * - The `msg.value` is >= the registerFee.
+     * - The `deadline` must be in the future.
+     * - The EIP712 signature `sig` must be valid.
+     *
+     * @param custody The custody address for the account. Also the signer of the EIP712 `sig`.
+     * @param username The username for the account, for client-side human-readable identification.
+     * @param recovery The address wich can recover the account. Set to address(0) to disable recovery.
+     * @param deadline The expiration timestamp for the signature.
+     * @param sig The EIP712 "Register" signature, signed by the custody address.
+     *
+     * @return id The registered account ID.
+     */
+    function registerAndDelegateFor(
+        address custody,
+        string calldata username,
+        address recovery,
+        uint256 delegateeId,
         uint256 deadline,
         bytes calldata sig
     ) external payable returns (uint256 id);
@@ -385,4 +451,11 @@ interface IIdGateway {
         uint256 changeRecoveryFee_,
         uint256 recoverFee_
     ) external;
+
+    // =============================================================
+    //                      DELEGATE REGISTRY
+    // =============================================================
+
+    /// @notice Set the address of the DelegateRegistry contract.
+    function setDelegateRegistry(address delegateRegistry_) external;
 }

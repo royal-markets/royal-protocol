@@ -36,7 +36,10 @@ contract DelegateRegistry is
     UUPSUpgradeable
 {
     /// @notice The RoyalProtocol IdRegistry contract
-    IIdRegistry public idRegistry = IIdRegistry(0x0000002c243D1231dEfA58915324630AB5dBd4f4);
+    IIdRegistry public idRegistry;
+
+    /// @notice The RoyalProtocol IdGateway contract
+    address public idGateway;
 
     /* solhint-disable gas-small-strings */
 
@@ -71,6 +74,11 @@ contract DelegateRegistry is
 
     /// @dev Delegate enumeration inbox, for pushing new hashes only
     mapping(uint256 toId => bytes32[] delegationHashes) internal _incomingDelegationHashes;
+
+    modifier onlyIdGateway() {
+        if (msg.sender != address(idGateway)) revert Unauthorized();
+        _;
+    }
 
     /**
      * ----------- EIP712 -----------
@@ -115,6 +123,18 @@ contract DelegateRegistry is
                 /* solhint-enable avoid-low-level-calls */
             }
         }
+    }
+
+    /// @inheritdoc IDelegateRegistry
+    function delegateAllDuringRegistration(uint256 fromId, uint256 toId)
+        external
+        payable
+        override
+        onlyIdGateway
+        returns (bytes32 hash)
+    {
+        _validateDelegatee(toId);
+        return _delegateAll({fromId: fromId, toId: toId, rights: "", enable: true});
     }
 
     /// @inheritdoc IDelegateRegistry
@@ -552,17 +572,27 @@ contract DelegateRegistry is
     }
 
     /// @inheritdoc IDelegateRegistry
-    function getOutgoingDelegations(uint256 fromId) external view returns (Delegation[] memory delegations_) {
+    function getOutgoingDelegations(uint256 fromId) external view override returns (Delegation[] memory delegations_) {
         delegations_ = _getValidDelegationsFromHashes(_outgoingDelegationHashes[fromId]);
     }
 
     /// @inheritdoc IDelegateRegistry
-    function getIncomingDelegationHashes(uint256 toId) external view returns (bytes32[] memory delegationHashes) {
+    function getIncomingDelegationHashes(uint256 toId)
+        external
+        view
+        override
+        returns (bytes32[] memory delegationHashes)
+    {
         delegationHashes = _getValidDelegationHashesFromHashes(_incomingDelegationHashes[toId]);
     }
 
     /// @inheritdoc IDelegateRegistry
-    function getOutgoingDelegationHashes(uint256 fromId) external view returns (bytes32[] memory delegationHashes) {
+    function getOutgoingDelegationHashes(uint256 fromId)
+        external
+        view
+        override
+        returns (bytes32[] memory delegationHashes)
+    {
         delegationHashes = _getValidDelegationHashesFromHashes(_outgoingDelegationHashes[fromId]);
     }
 
@@ -570,6 +600,7 @@ contract DelegateRegistry is
     function getDelegationsFromHashes(bytes32[] calldata hashes)
         external
         view
+        override
         returns (Delegation[] memory delegations_)
     {
         uint256 length = hashes.length;
@@ -606,13 +637,13 @@ contract DelegateRegistry is
     /**
      * ----------- EXTERNAL STORAGE ACCESS -----------
      */
-    function readSlot(bytes32 location) external view returns (bytes32 contents) {
+    function readSlot(bytes32 location) external view override returns (bytes32 contents) {
         assembly {
             contents := sload(location)
         }
     }
 
-    function readSlots(bytes32[] calldata locations) external view returns (bytes32[] memory contents) {
+    function readSlots(bytes32[] calldata locations) external view override returns (bytes32[] memory contents) {
         uint256 length = locations.length;
         contents = new bytes32[](length);
         bytes32 tempLocation;
@@ -916,9 +947,15 @@ contract DelegateRegistry is
      */
 
     /// @notice Set the address of the IdRegistry contract.
-    function setIdRegistry(address idRegistry_) external {
+    function setIdRegistry(address idRegistry_) external onlyOwner {
         emit IdRegistrySet(address(idRegistry), idRegistry_);
         idRegistry = IIdRegistry(idRegistry_);
+    }
+
+    /// @notice Set the address of the IdGateway contract.
+    function setIdGateway(address idGateway_) external onlyOwner {
+        emit IdGatewaySet(idGateway, idGateway_);
+        idGateway = idGateway_;
     }
 
     /**

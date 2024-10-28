@@ -18,6 +18,9 @@ contract IdGatewayTest is ProvenanceTest {
     event RecoveryAddressChanged(uint256 indexed id, address indexed recovery);
     event Recovered(uint256 indexed id, address indexed to);
 
+    // Emitted by DelegateRegistry
+    event DelegateAll(uint256 indexed fromId, uint256 indexed toId, bytes32 rights, bool enable);
+
     // =============================================================
     //                           ERRORS
     // =============================================================
@@ -639,6 +642,83 @@ contract IdGatewayTest is ProvenanceTest {
         vm.prank(caller);
         idGateway.registerFor(custody, username, recovery, deadline, sig);
     }
+
+    // =============================================================
+    //                          registerAndDelegate()
+    // =============================================================
+
+    function testFuzz_registerAndDelegate(address custody, uint8 usernameLength_, address recovery, address delegatee)
+        public
+    {
+        // Bound inputs that need to be bound.
+        vm.assume(custody != address(0));
+        uint256 usernameLength = _boundUsernameLength(usernameLength_);
+        string memory username = _getRandomValidUniqueUsername(usernameLength);
+        vm.assume(delegatee != custody && delegatee != address(0));
+
+        uint256 delegateeId = _register(delegatee, "delegatee");
+
+        // Call .register() and check the emitted event
+        uint256 expectedId = 2;
+        vm.expectEmit();
+        emit Registered(expectedId, custody, username, recovery);
+        vm.expectEmit();
+        emit DelegateAll(expectedId, delegateeId, bytes32(0), true);
+        vm.prank(custody);
+        idGateway.registerAndDelegate(username, recovery, delegateeId);
+
+        // Assert Postconditions
+        _assertRegisterAndDelegatePostconditions(expectedId, custody, username, recovery, delegateeId);
+    }
+
+    // TODO: Way more tests
+
+    // =============================================================
+    //                   registerAndDelegateFor()
+    // =============================================================
+
+    function testFuzz_registerAndDelegateFor(
+        address caller,
+        uint256 custodyPk_,
+        uint8 usernameLength_,
+        address recovery,
+        address delegatee,
+        uint40 deadline_
+    ) public {
+        // Bound inputs that need to be bound.
+        uint256 custodyPk = _boundPk(custodyPk_);
+        address custody = vm.addr(custodyPk);
+
+        uint256 usernameLength = _boundUsernameLength(usernameLength_);
+        string memory username = _getRandomValidUniqueUsername(usernameLength);
+
+        vm.assume(delegatee != custody && delegatee != address(0));
+
+        uint256 deadline = _boundDeadline(deadline_);
+
+        uint256 delegateeId = _register(delegatee, "delegatee");
+
+        // Assert Preconditions
+        uint256 expectedId = 2;
+        assertEq(idGateway.nonces(custody), 0);
+
+        // Register the ID with an EIP712 signature
+        bytes memory sig = _signRegisterAndDelegate(custodyPk, custody, username, recovery, delegateeId, deadline);
+
+        // Call .registerFor() and check the emitted event
+        vm.expectEmit();
+        emit Registered(expectedId, custody, username, recovery);
+        vm.expectEmit();
+        emit DelegateAll(expectedId, delegateeId, bytes32(0), true);
+        vm.prank(caller);
+        idGateway.registerAndDelegateFor(custody, username, recovery, delegateeId, deadline, sig);
+
+        // Assert Postconditions
+        assertEq(idGateway.nonces(custody), 1);
+        _assertRegisterAndDelegatePostconditions(expectedId, custody, username, recovery, delegateeId);
+    }
+
+    // TODO: Way more tests
 
     // =============================================================
     //                        transfer()
@@ -2894,6 +2974,18 @@ contract IdGatewayTest is ProvenanceTest {
         assertEq(idRegistry.recoveryOf(id), recovery);
     }
 
+    function _assertRegisterAndDelegatePostconditions(
+        uint256 id,
+        address custody,
+        string memory username,
+        address recovery,
+        uint256 delegateeId
+    ) internal view {
+        _assertRegisterPostconditions(id, custody, username, recovery);
+        bytes32 rights = bytes32(0);
+        assertEq(idRegistry.canAct(id, delegateeId, address(provenanceGateway), rights), true);
+    }
+
     // TODO: Doc
     function _assertTransferPreconditions(
         uint256 id,
@@ -2981,6 +3073,34 @@ contract IdGatewayTest is ProvenanceTest {
                     custody,
                     keccak256(bytes(username)),
                     recovery,
+                    idGateway.nonces(custody),
+                    deadline
+                )
+            )
+        );
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, digest);
+        signature = abi.encodePacked(r, s, v);
+        assertEq(signature.length, 65);
+    }
+
+    /// @dev Sign the EIP712 message for a registerAndDelegateFor transaction.
+    function _signRegisterAndDelegate(
+        uint256 pk,
+        address custody,
+        string memory username,
+        address recovery,
+        uint256 delegateeId,
+        uint256 deadline
+    ) internal view returns (bytes memory signature) {
+        bytes32 digest = idGateway.hashTypedData(
+            keccak256(
+                abi.encode(
+                    idGateway.REGISTER_AND_DELEGATE_TYPEHASH(),
+                    custody,
+                    keccak256(bytes(username)),
+                    recovery,
+                    delegateeId,
                     idGateway.nonces(custody),
                     deadline
                 )

@@ -63,6 +63,9 @@ interface IDelegateRegistry {
     /// @notice Emitted when the IdRegistry is set.
     event IdRegistrySet(address indexed oldIdRegistry, address indexed newIdRegistry);
 
+    /// @notice Emitted when the IdGateway is set.
+    event IdGatewaySet(address indexed oldIdGateway, address indexed newIdGateway);
+
     /// @notice Thrown if multicall calldata is malformed
     error MulticallFailed();
 
@@ -87,6 +90,18 @@ interface IDelegateRegistry {
      * @return results The results from each of the calls passed in via data
      */
     function multicall(bytes[] calldata data) external payable returns (bytes[] memory results);
+
+    /**
+     * @notice Allow the delegate to act on behalf of the Royal Protocol ID of `msg.sender` for all contracts and all rights
+     *         Only callable during registration by the IdGateway
+     * @param fromId The Royal Protocol ID to act as delegator
+     * @param toId The Royal Protocol ID to act as delegate
+     * @return delegationHash The unique identifier of the delegation
+     */
+    function delegateAllDuringRegistration(uint256 fromId, uint256 toId)
+        external
+        payable
+        returns (bytes32 delegationHash);
 
     /**
      * @notice Allow the delegate to act on behalf of the Royal Protocol ID of `msg.sender` for all contracts

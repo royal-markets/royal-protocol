@@ -13,6 +13,13 @@ import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 
 import {LibString} from "solady/utils/LibString.sol";
 
+interface IDelegateRegistry {
+    function delegateAllDuringRegistration(uint256 fromId, uint256 toId)
+        external
+        payable
+        returns (bytes32 delegationHash);
+}
+
 /**
  * @title RoyalProtocol IdGateway
  *
@@ -32,6 +39,11 @@ contract IdGateway is IIdGateway, Withdrawable, Signatures, EIP712, Nonces, Init
     /// @inheritdoc IIdGateway
     bytes32 public constant REGISTER_TYPEHASH =
         keccak256("Register(address custody,string username,address recovery,uint256 nonce,uint256 deadline)");
+
+    /// @inheritdoc IIdGateway
+    bytes32 public constant REGISTER_AND_DELEGATE_TYPEHASH = keccak256(
+        "RegisterAndDelegate(address custody,string username,address recovery,uint256 delegateeId,uint256 nonce,uint256 deadline)"
+    );
 
     /// @inheritdoc IIdGateway
     bytes32 public constant TRANSFER_TYPEHASH =
@@ -70,6 +82,9 @@ contract IdGateway is IIdGateway, Withdrawable, Signatures, EIP712, Nonces, Init
 
     /// @inheritdoc IIdGateway
     IIdRegistry public idRegistry;
+
+    /// @inheritdoc IIdGateway
+    address public delegateRegistry;
 
     /// @inheritdoc IIdGateway
     uint256 public registerFee;
@@ -152,6 +167,59 @@ contract IdGateway is IIdGateway, Withdrawable, Signatures, EIP712, Nonces, Init
 
         // Register the new ID.
         id = idRegistry.register(custody, username, recovery);
+    }
+
+    /// @inheritdoc IIdGateway
+    function registerAndDelegate(string calldata username, address recovery, uint256 delegateeId)
+        external
+        payable
+        override
+        whenNotPaused
+        returns (uint256 id)
+    {
+        if (msg.value < registerFee) revert InsufficientFee();
+
+        // Validate the new username.
+        _validateUsername(username);
+
+        // Register the new ID.
+        id = idRegistry.register(msg.sender, username, recovery);
+
+        // Set up delegation
+        // slither-disable-next-line unused-return
+        IDelegateRegistry(delegateRegistry).delegateAllDuringRegistration({fromId: id, toId: delegateeId});
+    }
+
+    /// @inheritdoc IIdGateway
+    function registerAndDelegateFor(
+        address custody,
+        string calldata username,
+        address recovery,
+        uint256 delegateeId,
+        uint256 deadline,
+        bytes calldata sig
+    ) external payable override whenNotPaused returns (uint256 id) {
+        if (msg.value < registerFee) revert InsufficientFee();
+
+        // Validate the new username.
+        _validateUsername(username);
+
+        // Reverts if the signature is invalid
+        _verifyRegisterAndDelegateSig({
+            custody: custody,
+            username: username,
+            recovery: recovery,
+            delegateeId: delegateeId,
+            deadline: deadline,
+            sig: sig
+        });
+
+        // Register the new ID.
+        id = idRegistry.register(custody, username, recovery);
+
+        // Set up delegation
+        // slither-disable-next-line unused-return
+        IDelegateRegistry(delegateRegistry).delegateAllDuringRegistration({fromId: id, toId: delegateeId});
     }
 
     // =============================================================
@@ -452,6 +520,32 @@ contract IdGateway is IIdGateway, Withdrawable, Signatures, EIP712, Nonces, Init
         _verifySig(digest, custody, deadline, sig);
     }
 
+    /// @dev Verify the EIP712 signature for a registerAndDelegateFor transaction.
+    function _verifyRegisterAndDelegateSig(
+        address custody,
+        string calldata username,
+        address recovery,
+        uint256 delegateeId,
+        uint256 deadline,
+        bytes calldata sig
+    ) internal {
+        bytes32 digest = _hashTypedData(
+            keccak256(
+                abi.encode(
+                    REGISTER_AND_DELEGATE_TYPEHASH,
+                    custody,
+                    keccak256(bytes(username)),
+                    recovery,
+                    delegateeId,
+                    _useNonce(custody),
+                    deadline
+                )
+            )
+        );
+
+        _verifySig(digest, custody, deadline, sig);
+    }
+
     /// @dev Verify the EIP712 signature for a transfer(For) transaction.
     function _verifyTransferSig(uint256 id, address to, uint256 deadline, address signer, bytes calldata sig)
         internal
@@ -549,6 +643,16 @@ contract IdGateway is IIdGateway, Withdrawable, Signatures, EIP712, Nonces, Init
         emit ChangeUsernameFeeSet(changeUsernameFee_);
         emit ChangeRecoveryFeeSet(changeRecoveryFee_);
         emit RecoverFeeSet(recoverFee_);
+    }
+
+    // =============================================================
+    //                      DELEGATE REGISTRY
+    // =============================================================
+
+    /// @inheritdoc IIdGateway
+    function setDelegateRegistry(address delegateRegistry_) external override onlyOwner {
+        emit DelegateRegistrySet(delegateRegistry, delegateRegistry_);
+        delegateRegistry = delegateRegistry_;
     }
 
     // =============================================================
