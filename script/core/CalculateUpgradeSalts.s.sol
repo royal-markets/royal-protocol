@@ -22,14 +22,14 @@ contract CalculateUpgradeSalts is Script {
     bytes32 idGatewaySalt = 0x7e1652bb6a2c7a44763608d0b755f496e8a209774ac6fa4bbe6bd8738ad931b6;
     bytes32 provenanceRegistrySalt = 0x4a99d5dd2cde4fca053af014b37ac864584c03edd64e38fde5cc6306953dcfbf;
     bytes32 provenanceGatewaySalt = 0xbd3bd2122b48ac665243d241d910dccde5f35cfbd57566ec4d920452718366c4;
-    bytes32 delegateRegistrySalt = 0xf428a3586c821605649232d9cac64cb85d816683667985e7c60bed4ce6507da0;
+    bytes32 delegateRegistrySalt = 0xb11c6b5de8270722df5b957b4b46fdd39edbaf2251e6b13225d09ffbdb1b2f7d;
 
     // Sanity check the calculated addresses.
     address idRegistry = address(0x00000083D46c4449a0f599eD2982EC8FfaA5D88F);
     address idGateway = address(0x000000135c0b47e3F4912b0B11e8Bd604Cb8474C);
     address provenanceRegistry = address(0x000000edD8565fDe8Bb8c91B74d13128eBDCDD2C);
     address provenanceGateway = address(0x0000001A503698b40571AfAbaD131D7e6C2442f9);
-    address delegateRegistry = address(0x000000DFA886f7600c316860c5f69B6d3CC94C59);
+    address delegateRegistry = address(0x000000eBF0A1A58ac0Ba91eB7a804d7028F98853);
 
     // Calculate initCode hashes.
     function run() external view {

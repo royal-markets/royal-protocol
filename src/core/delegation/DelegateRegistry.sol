@@ -58,12 +58,12 @@ contract DelegateRegistry is
     );
 
     /// @notice EIP712 typehash for the delegation of ERC20 rights
-    bytes32 public constant DELEGATE_ERC20 = keccak256(
+    bytes32 public constant DELEGATE_ERC20_TYPEHASH = keccak256(
         "DelegateERC20(uint256 fromId,uint256 toId,address contract_,bytes32 rights,uint256 amount,bool enable,uint256 nonce,uint256 deadline)"
     );
 
     /// @notice EIP712 typehash for the delegation of ERC1155 rights
-    bytes32 public constant DELEGATE_ERC1155 = keccak256(
+    bytes32 public constant DELEGATE_ERC1155_TYPEHASH = keccak256(
         "DelegateERC1155(uint256 fromId,uint256 toId,address contract_,uint256 tokenId,bytes32 rights,uint256 amount,bool enable,uint256 nonce,uint256 deadline)"
     );
 
@@ -913,7 +913,9 @@ contract DelegateRegistry is
         address from = idRegistry.custodyOf(fromId);
 
         bytes32 digest = _hashTypedData(
-            keccak256(abi.encode(DELEGATE_ERC20, fromId, toId, contract_, rights, amount, _useNonce(from), deadline))
+            keccak256(
+                abi.encode(DELEGATE_ERC20_TYPEHASH, fromId, toId, contract_, rights, amount, _useNonce(from), deadline)
+            )
         );
 
         _verifySig(digest, from, deadline, sig);
@@ -934,7 +936,15 @@ contract DelegateRegistry is
         bytes32 digest = _hashTypedData(
             keccak256(
                 abi.encode(
-                    DELEGATE_ERC1155, fromId, toId, contract_, tokenId, rights, amount, _useNonce(from), deadline
+                    DELEGATE_ERC1155_TYPEHASH,
+                    fromId,
+                    toId,
+                    contract_,
+                    tokenId,
+                    rights,
+                    amount,
+                    _useNonce(from),
+                    deadline
                 )
             )
         );
