@@ -12,7 +12,7 @@ import {DelegateRegistry} from "../../src/core/delegation/DelegateRegistry.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 
 // NOTE: Needs to be called by the RoyalProtocol owner address.
-contract UpgradeProtocol is Script {
+contract UpgradeProtocolContracts is Script {
     // =============================================================
     //                          INPUTS
     // =============================================================

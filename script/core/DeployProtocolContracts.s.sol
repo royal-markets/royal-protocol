@@ -10,7 +10,12 @@ import {ProvenanceGateway} from "../../src/core/ProvenanceGateway.sol";
 
 import {LibClone} from "solady/utils/LibClone.sol";
 
-contract DeployRoyalProtocol is Script {
+/**
+ * NOTE: This script won't work unless you go back in Git history to get the contract code at time of initial deploy.
+ *
+ * If this ends up being an annoying problem - right solve is probably to use CREATE3 moving forward.
+ */
+contract DeployProtocolContracts is Script {
     // =============================================================
     //                          INPUTS
     // =============================================================
@@ -20,11 +25,20 @@ contract DeployRoyalProtocol is Script {
     bytes32 idGatewaySalt = 0x5c04a4a41ecb50ba09e6cc0ea8f9fa386da6472f459fa4e8405983201063a5ac;
     bytes32 provenanceRegistrySalt = 0xd808620b9482d421f45fbb665f508d0cb43c6085006816061c22d56430691f33;
     bytes32 provenanceGatewaySalt = 0xa041d7c995b5cf119ca344195e34cee5d16f5da9e5850b68eb9f1c8149449576;
+    bytes32 delegateRegistrySalt = 0xf5bf81b6deba33121dd051d98eff71f399925dba9d5010a496ebb30ca1531567;
 
     bytes32 idRegistryProxySalt = 0x2f12417320790ce587c16f9d13ffbe7fa3b1d31f8e3856728bca4e5a00663052;
     bytes32 idGatewayProxySalt = 0xa4c0f5d2ed58ddd62d2ae7e372e00abb2549ffaa2e3500d5ffc7b543d8717d2c;
     bytes32 provenanceRegistryProxySalt = 0x9cffda279a73972e3960008f3863355e414a28d01b58b04b305a386bc81ce353;
     bytes32 provenanceGatewayProxySalt = 0xb96f58746c0581b1ac7c78c157ded10a92623443db30ff304a810addfc74bc56;
+    bytes32 delegateRegistryProxySalt = 0x1156cd4e919ca25dd1aafd4328e68eaf4bd98e0ab0a7e0be373758e5933015a4;
+
+    // NOTE: Double-check addresses?
+    address public constant ID_REGISTRY_ADDR = 0x0000002c243D1231dEfA58915324630AB5dBd4f4;
+    address public constant ID_GATEWAY_ADDR = 0x000000aA0d40b46F0A78d145c321a9DcfD154Ba7;
+    address public constant PROVENANCE_REGISTRY_ADDR = 0x0000009F840EeF8A92E533468A0Ef45a1987Da66;
+    address public constant PROVENANCE_GATEWAY_ADDR = 0x000000456Bb9Fd42ADd75F4b5c2247f47D45a0A2;
+    address public constant DELEGATE_REGISTRY_ADDR = 0x000000f1CABe81De9e020C9fac95318b14B80F14;
 
     address public constant OWNER = 0x62Bd6bD77403268E387a8c7e09aF5D3127186be8;
     address public constant MIGRATOR = 0xE5673eD07d596E558D280DACdaE346FAF9c9B1A7;
@@ -74,6 +88,14 @@ contract DeployRoyalProtocol is Script {
 
         // Set the ProvenanceGateway on the ProvenanceRegistry
         provenanceRegistry.setProvenanceGateway(address(provenanceGateway));
+
+        address delegateRegistryImplementation = address(new DelegateRegistry{salt: delegateRegistrySalt}());
+        DelegateRegistry delegateRegistry = DelegateRegistry(
+            LibClone.deployDeterministicERC1967(delegateRegistryImplementation, delegateRegistryProxySalt)
+        );
+        delegateRegistry.initialize(ID_REGISTRY_ADDR, OWNER);
+        console.log("DelegateRegistry address: %s", address(delegateRegistry));
+        IdRegistry(ID_REGISTRY_ADDR).setDelegateRegistry(address(delegateRegistry));
 
         vm.stopBroadcast();
     }
