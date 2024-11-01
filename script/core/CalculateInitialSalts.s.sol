@@ -133,12 +133,6 @@ contract CalculateInitialSalts is Script {
         delegateRegistryProxy = LibClone.deployDeterministicERC1967(delegateRegistry, delegateRegistryProxySalt);
         console.log("Delegate Registry Proxy address: ");
         console.logAddress(delegateRegistryProxy);
-
-        // Sanity check the calculated proxy addresses.
-        // sanityCheckProxy(idRegistry, idRegistryProxySalt, idRegistryProxy);
-        // sanityCheckProxy(idGateway, idGatewayProxySalt, idGatewayProxy);
-        // sanityCheckProxy(provenanceRegistry, provenanceRegistryProxySalt, provenanceRegistryProxy);
-        // sanityCheckProxy(provenanceGateway, provenanceGatewayProxySalt, provenanceGatewayProxy);
     }
 
     function sanityCheck(bytes32 initCodeHash, bytes32 salt, address expectedAddress) internal pure {
@@ -154,17 +148,4 @@ contract CalculateInitialSalts is Script {
             return;
         }
     }
-
-    // function sanityCheckProxy(address implementation, bytes32 salt, address expectedAddress) internal pure {
-    //     // Compute the addresses using the salts.
-    //     address predictedAddress = LibClone.predictDeterministicAddressERC1967(implementation, salt, OWNER);
-    //     if (predictedAddress != expectedAddress) {
-    //         console.log("");
-
-    //         console.log("ERROR: Address mismatch!");
-    //         console.log("Expected address: %s", address(expectedAddress));
-    //         console.log("Computed address: %s", address(predictedAddress));
-    //         return;
-    //     }
-    // }
 }
