@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The Royal Protocol offers an immutable solution to register and verify authorship of creative works. 
+The Royal Protocol offers an immutable solution to register and verify authorship of creative works.
 The protocol is completely open-source and permissionless and designed for multiple parties to utilize and build on.
 
 Registering provenance onchain will enable provability of authorship or creation across a wide range of creative works, including:
@@ -18,72 +18,67 @@ This repository contains all the contracts deployed and used by the Royal Protoc
 
 ### Core Protocol Contracts
 
-The core protocol contracts are divided between the Account system and the Provenance system.
+The core protocol contracts are divided between the Account system, the Provenance system, and the Delegation system.
 
 **Account System**:
 
 Users create accounts by registering them through the `IdGateway`.
-The account system is ID-based, not address based. 
-Because of this, you can transfer the account between addresses if desired, and recover to a different address if needed (and if you set up recovery in advance).
+The account system is ID-based, not address based.
+Because of this, you can transfer the account between addresses if desired, and recover an account a different address if needed (if you set up recovery in advance).
 
 - **[IdRegistry](./src/core/IdRegistry.sol)** - track account data for Royal Protocol accounts.
-- **[IdGateway](./src/core/IdGateway.sol)** - wrapper for account creation & update logic.
+- **[IdGateway](./src/core/IdGateway.sol)** - wrapper for account creation & update logic - handles all write functions.
 
 **Provenance System**:
 
-A `ProvenanceClaim` ties together a Royal Protocol Account ID with a [blake3 hash](https://en.wikipedia.org/wiki/BLAKE_(hash_function)#BLAKE3) of some piece of content, and any associated metadata.
+A `ProvenanceClaim` ties together a Royal Protocol Account ID with a [blake3 hash](<https://en.wikipedia.org/wiki/BLAKE_(hash_function)#BLAKE3>) of some piece of content.
 This lets us tie identities, of both the creator and the AI model if relevant, with a creative work such as a piece of music, artwork, etc.
-The `ProvenanceRegistry` holds `ProvenanceClaim` data for creative works. 
-Each `ProvenanceClaim` may be associated with an NFT owned by the "originator" of the `ProvenanceClaim`. 
+The `ProvenanceRegistry` holds `ProvenanceClaim` data for creative works.
+Each `ProvenanceClaim` may be associated with an NFT owned by the "originator" of the `ProvenanceClaim`.
 Any given NFT can only be associated with a single `ProvenanceClaim`.
 
 - **[ProvenanceRegistry](./src/core/ProvenanceRegistry.sol)** - track `ProvenanceClaim` data, claimed by Royal Protocol accounts.
-- **[ProvenanceGateway](./src/core/ProvenanceGateway.sol)** - wrapper for `ProvenanceClaim` registration logic.
+- **[ProvenanceGateway](./src/core/ProvenanceGateway.sol)** - wrapper for `ProvenanceClaim` registration logic - handles all write functions.
 
-#### Deployment addresses
+**Delegation System**:
+
+Users can delegate certain actions on the protocol to other protocol Account IDs. For example, one account may register provenance on behalf of another account that has delegated permissions to it. Delegations may also be used by 3rd-party extensions of the protocol.
+
+- **[DelegateRegistry](./src/core/delegation/DelegateRegistry.sol)** - track `Delegation` data, written by Royal Protocol accounts.
+
+#### Deployment Addresses
 
 The v1.0 contracts are deployed on both Base Mainnet and Base Sepolia, to the same canonical addresses on both networks.
 
-| Contract           | Address                                                                                                               | On testnet  |
-| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| [IdRegistry](./src/core/IdRegistry.sol)                 | [0x0000002c243D1231dEfA58915324630AB5dBd4f4](https://basescan.org/address/0x0000002c243D1231dEfA58915324630AB5dBd4f4) | [Testnet block explorer](https://sepolia.basescan.org/address/0x0000002c243D1231dEfA58915324630AB5dBd4f4) |
-| [IdGateway](./src/core/IdGateway.sol)                   | [0x000000aA0d40b46F0A78d145c321a9DcfD154Ba7](https://basescan.org/address/0x000000aA0d40b46F0A78d145c321a9DcfD154Ba7) | [Testnet block explorer](https://sepolia.basescan.org/address/0x000000aA0d40b46F0A78d145c321a9DcfD154Ba7) |
-| [ProvenanceRegistry](./src/core/ProvenanceRegistry.sol) | [0x0000009F840EeF8A92E533468A0Ef45a1987Da66](https://basescan.org/address/0x0000009F840EeF8A92E533468A0Ef45a1987Da66) | [Testnet block explorer](https://sepolia.basescan.org/address/0x0000009F840EeF8A92E533468A0Ef45a1987Da66) |
-| [ProvenanceGateway](./src/core/ProvenanceGateway.sol)   | [0x000000456Bb9Fd42ADd75F4b5c2247f47D45a0A2](https://basescan.org/address/0x000000456Bb9Fd42ADd75F4b5c2247f47D45a0A2) | [Testnet block explorer](https://sepolia.basescan.org/address/0x000000456Bb9Fd42ADd75F4b5c2247f47D45a0A2) |
+| Contract                                                       | Address                                                                                                               | On testnet                                                                                                |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| [IdRegistry](./src/core/IdRegistry.sol)                        | [0x0000002c243D1231dEfA58915324630AB5dBd4f4](https://basescan.org/address/0x0000002c243D1231dEfA58915324630AB5dBd4f4) | [Testnet block explorer](https://sepolia.basescan.org/address/0x0000002c243D1231dEfA58915324630AB5dBd4f4) |
+| [IdGateway](./src/core/IdGateway.sol)                          | [0x000000aA0d40b46F0A78d145c321a9DcfD154Ba7](https://basescan.org/address/0x000000aA0d40b46F0A78d145c321a9DcfD154Ba7) | [Testnet block explorer](https://sepolia.basescan.org/address/0x000000aA0d40b46F0A78d145c321a9DcfD154Ba7) |
+| [ProvenanceRegistry](./src/core/ProvenanceRegistry.sol)        | [0x0000009F840EeF8A92E533468A0Ef45a1987Da66](https://basescan.org/address/0x0000009F840EeF8A92E533468A0Ef45a1987Da66) | [Testnet block explorer](https://sepolia.basescan.org/address/0x0000009F840EeF8A92E533468A0Ef45a1987Da66) |
+| [ProvenanceGateway](./src/core/ProvenanceGateway.sol)          | [0x000000456Bb9Fd42ADd75F4b5c2247f47D45a0A2](https://basescan.org/address/0x000000456Bb9Fd42ADd75F4b5c2247f47D45a0A2) | [Testnet block explorer](https://sepolia.basescan.org/address/0x000000456Bb9Fd42ADd75F4b5c2247f47D45a0A2) |
+| [DelegateRegistry](./src/core/delegation/DelegateRegistry.sol) | [0x000000f1CABe81De9e020C9fac95318b14B80F14](https://basescan.org/address/0x000000f1CABe81De9e020C9fac95318b14B80F14) | [Testnet block explorer](https://sepolia.basescan.org/address/0x000000f1CABe81De9e020C9fac95318b14B80F14) |
 
-
-### Sample contracts
+### Sample Contracts
 
 These extra contracts are included in this repo for use by service providers or other entities operating within the protocol.
 
-#### Recovery contract
+#### RecoveryProxy
 
-When users register for an account they can specify a recovery address that will be allowed to reset their address should they lose their custody wallet's passphrase. 
-**[`RecoveryProxy`](./src/extra/RecoveryProxy.sol)** is a smart contract that shows how to use this functionality.
-The recovery address can, for example, be a [multi-sig](https://safe.global/wallet) to enable [social recovery](https://wiki.polkadot.network/docs/kusama-social-recovery).
+When users register for an account they can specify a recovery address that will be allowed to reset their address should they lose their custody wallet's passphrase.
+
+**[`RecoveryProxy`](./src/extra/RecoveryProxy.sol)** is a smart contract that can recover an account to a different address.
+
+The recovery address could also, for example, be a [multi-sig](https://safe.global/wallet) to enable [social recovery](https://wiki.polkadot.network/docs/kusama-social-recovery).
 
 For now, Royal's `RecoveryProxy` is deployed at address [`0x06428ebF3D4A6322611792BDf674EE2600e37E29`](https://basescan.org/address/0x06428ebF3D4A6322611792BDf674EE2600e37E29).
-*If* you register for account recovery through our web interface, and lose your passphrase, we'll be able to reset your account's address.
+_If_ you register for account recovery through our web interface, and lose your passphrase, we'll be able to reset your account's address.
 
-**Note:** If you are registering your account directly with the `IdGateway` contracts, do *not* put this as a recovery address.
+**Note:** If you are registering your account directly with the `IdGateway` contracts, do _not_ put this as a recovery address.
 Unless you registered through our web interface, we won't have any way to authenticate you and won't reset your address.
 
-#### Registrar contracts
+#### RoyalProtocolAccount
 
-These contracts are intended to be used for offering a registrar service, a Royal Protocol account that registers `ProvenanceClaim`s on behalf of other accounts / users. 
-This effectively provides a co-signature or co-attestation that the originator is actually the content of the work.
-
-As an example, imagine I have a AI music app "HAL9000". 
-I could create a registrar contract that was the custody address of the "HAL9000" Royal Protocol account, and then all songs generated by users on my app could be registered by my Registrar - to indicate that song was generated by that user on the HAL9000 app.
-
-**NOTE**: Registration does require that the user of my app has a Royal Protocol account that a `ProvenanceClaim` can point to as the originator.
-
-- **[`RoyalProtocolAccount`](./src/extra/RoyalProtocolAccount.sol)** - An abstract contract with logic for managing a Royal Protocol account and registering `ProvenanceClaim`s from a smart contract. Extended by the `ProvenanceRegistrar` contract.
-- **[`ProvenanceRegistrar`](./src/extra/ProvenanceRegistrar.sol)** - A smart contract that can register provenance on behalf of other users.
-
-  **NOTE:** For this to work, delegations from users need to be set to this smart contract address on [delegate.xyz](https://delegate.xyz/), *or* the users need to sign an EIP712 message for each `ProvenanceClaim` they want registered by the Registrar.
-
-- **[ProvenanceToken](./src/extra/ProvenanceToken.sol)** - A simple ERC721 NFT contract. Each `ProvenanceClaim` can optionally have a corresponding NFT token. This contract was designed to be used with the `ProvenanceRegistrar` contract.
+There are a few functions that would be useful to any contract attempting to interact with the Royal Protocol. **[`RoyalProtocolAccount`](./src/extra/RoyalProtocolAccount.sol)** is an abstract contract that any contract can inherit with logic for managing a Royal Protocol account (owned by a smart contract) and registering `ProvenanceClaim`s from a smart contract.
 
 ## Contributing
 

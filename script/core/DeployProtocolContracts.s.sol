@@ -7,6 +7,7 @@ import {IdRegistry} from "../../src/core/IdRegistry.sol";
 import {IdGateway} from "../../src/core/IdGateway.sol";
 import {ProvenanceRegistry} from "../../src/core/ProvenanceRegistry.sol";
 import {ProvenanceGateway} from "../../src/core/ProvenanceGateway.sol";
+import {DelegateRegistry} from "../../src/core/delegation/DelegateRegistry.sol";
 
 import {LibClone} from "solady/utils/LibClone.sol";
 
