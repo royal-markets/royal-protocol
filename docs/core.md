@@ -1,7 +1,7 @@
 # Royal Protocol Contracts
 
-There are two main parts of the Royal Protocol - the *Account* system and the *Provenance* system.
-Users create accounts by registering them through the [`IdGateway`](../src/core/IdGateway.sol) contract. 
+There are two main parts of the Royal Protocol - the _Account_ system and the _Provenance_ system.
+Users create accounts by registering them through the [`IdGateway`](../src/IdGateway.sol) contract.
 The Account system automatically assigns an ID to each user, but the user provides the rest of the data in the `User` struct:
 
 ```solidity
@@ -50,7 +50,7 @@ struct ProvenanceClaim {
 > NOTE: For a registrar to have permission to register a `ProvenanceClaim` on behalf of another account, that account needs to delegate permission.
 > There are two ways to do so:
 >
-> - Set up delegations in [`DelegateRegistry`](../src/core/delegation/DelegateRegistry.sol).
+> - Set up delegations in [`DelegateRegistry`](../src/delegation/DelegateRegistry.sol).
 > - Sign an [EIP712 message](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-712.md) granting permission to a registrar to register a single `ProvenanceClaim` on their behalf for that particular hash.
 
 > This is an example of the call that authorizes a registrar to act on behalf of an author.
@@ -70,19 +70,19 @@ struct ProvenanceClaim {
 
 The account system is made up of 2 core contracts:
 
-- [`IdRegistry`](../src/core/IdRegistry.sol) - tracks and stores account data for Royal Protocol accounts.
-- [`IdGateway`](../src/core/IdGateway.sol) - wrapper for protocol account creation & update logic.
+- [`IdRegistry`](../src/IdRegistry.sol) - tracks and stores account data for Royal Protocol accounts.
+- [`IdGateway`](../src/IdGateway.sol) - wrapper for protocol account creation & update logic.
 
 ### IdRegistry
 
-The `IdRegistry` lets any Ethereum address claim a unique Royal Protocol account and a unique `username` for that account. 
+The `IdRegistry` lets any Ethereum address claim a unique Royal Protocol account and a unique `username` for that account.
 An Ethereum address can only be associated with one Royal Protocol account at a time.
 Each Royal Protocol account has a `custody` address that manages the user's account data.
 Accounts can also set an optional `recovery` address to allow transfering that account to another custody wallet, in case the initial custody wallet is lost.
 
 #### DelegateRegistry usage
 
-The [`DelegateRegistry`](../src/core/delegation/DelegateRegistry.sol) is only used by one function on `IdRegistry`, `canAct()`.
+The [`DelegateRegistry`](../src/delegation/DelegateRegistry.sol) is only used by one function on `IdRegistry`, `canAct()`.
 
 ```solidity
 /**
@@ -113,8 +113,8 @@ The two actions that delegations are possible for right now are registering a `P
         idRegistry.canAct(originatorId, registrarId, provenanceGateway, "assignNft")
 ```
 
-Right now, the `IdRegistry` looks up delegations on the [`DelegateRegistry`](../src/core/delegation/DelegateRegistry.sol). 
-But the contract address that `IdRegistry` uses to determine delegation at is updatable. 
+Right now, the `IdRegistry` looks up delegations on the [`DelegateRegistry`](../src/delegation/DelegateRegistry.sol).
+But the contract address that `IdRegistry` uses to determine delegation at is updatable.
 This gives the protocol the possibility to expand or change delegation logic moving forward.
 
 #### Utility Functions
@@ -159,8 +159,7 @@ uint256 registerFee = idGateway.registerFee();
 uint256 protocolAccountId = idGateway.register{value: registerFee}(myUsername, recovery);
 ```
 
-For other account management, like changing a username, changing the recovery address, or transfering the account to another custody address, look at the [`IIdGateway` interface](../src/core/interfaces/IIdGateway.sol) to see the function signatures.
-
+For other account management, like changing a username, changing the recovery address, or transfering the account to another custody address, look at the [`IIdGateway` interface](../src/interfaces/IIdGateway.sol) to see the function signatures.
 
 #### Utility Functions
 
@@ -185,16 +184,16 @@ For other account management, like changing a username, changing the recovery ad
 
 The Provenance system is also made up of 2 core contracts:
 
-- [`ProvenanceRegistry`](../src/core/ProvenanceRegistry.sol) - tracks and stores ProvenanceClaim data.
-- [`ProvenanceGateway`](../src/core/ProvenanceGateway.sol) - wrapper for ProvenanceClaim validation and registration logic.
+- [`ProvenanceRegistry`](../src/ProvenanceRegistry.sol) - tracks and stores ProvenanceClaim data.
+- [`ProvenanceGateway`](../src/ProvenanceGateway.sol) - wrapper for ProvenanceClaim validation and registration logic.
 
 ### ProvenanceRegistry
 
 `ProvenanceRegistry` holds `ProvenanceClaim` data for creative works. Each `ProvenanceClaim` _may_ be associated with an NFT (initially owned by the author of the `ProvenanceClaim`). Any given NFT can only be associated with a single `ProvenanceClaim`.
 
-A `ProvenanceClaim` ties together a Royal Protocol account with a [blake3 hash](https://en.wikipedia.org/wiki/BLAKE_(hash_function)#BLAKE3) of some piece of content.
+A `ProvenanceClaim` ties together a Royal Protocol account with a [blake3 hash](<https://en.wikipedia.org/wiki/BLAKE_(hash_function)#BLAKE3>) of some piece of content.
 
-Because blockchain interactions have a deterministic ordering anyone can determine who claimed any given piece of content first. 
+Because blockchain interactions have a deterministic ordering anyone can determine who claimed any given piece of content first.
 Additionally, each `ProvenanceClaim` has both an `originatorId` and a `registrarId` (for self-registeration, the two are identical).
 A signature from a trusted registrar is another data point that determines that a `ProvenanceClaim` is correct.
 

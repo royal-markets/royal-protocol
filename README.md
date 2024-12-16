@@ -26,8 +26,8 @@ Users create accounts by registering them through the `IdGateway`.
 The account system is ID-based, not address based.
 Because of this, you can transfer the account between addresses if desired, and recover an account a different address if needed (if you set up recovery in advance).
 
-- **[IdRegistry](./src/core/IdRegistry.sol)** - track account data for Royal Protocol accounts.
-- **[IdGateway](./src/core/IdGateway.sol)** - wrapper for account creation & update logic - handles all write functions.
+- **[IdRegistry](./src/IdRegistry.sol)** - track account data for Royal Protocol accounts.
+- **[IdGateway](./src/IdGateway.sol)** - wrapper for account creation & update logic - handles all write functions.
 
 **Provenance System**:
 
@@ -37,26 +37,26 @@ The `ProvenanceRegistry` holds `ProvenanceClaim` data for creative works.
 Each `ProvenanceClaim` may be associated with an NFT owned by the "originator" of the `ProvenanceClaim`.
 Any given NFT can only be associated with a single `ProvenanceClaim`.
 
-- **[ProvenanceRegistry](./src/core/ProvenanceRegistry.sol)** - track `ProvenanceClaim` data, claimed by Royal Protocol accounts.
-- **[ProvenanceGateway](./src/core/ProvenanceGateway.sol)** - wrapper for `ProvenanceClaim` registration logic - handles all write functions.
+- **[ProvenanceRegistry](./src/ProvenanceRegistry.sol)** - track `ProvenanceClaim` data, claimed by Royal Protocol accounts.
+- **[ProvenanceGateway](./src/ProvenanceGateway.sol)** - wrapper for `ProvenanceClaim` registration logic - handles all write functions.
 
 **Delegation System**:
 
 Users can delegate certain actions on the protocol to other protocol Account IDs. For example, one account may register provenance on behalf of another account that has delegated permissions to it. Delegations may also be used by 3rd-party extensions of the protocol.
 
-- **[DelegateRegistry](./src/core/delegation/DelegateRegistry.sol)** - track `Delegation` data, written by Royal Protocol accounts.
+- **[DelegateRegistry](./src/delegation/DelegateRegistry.sol)** - track `Delegation` data, written by Royal Protocol accounts.
 
 #### Deployment Addresses
 
 The v1.0 contracts are deployed on both Base Mainnet and Base Sepolia, to the same canonical addresses on both networks.
 
-| Contract                                                       | Address                                                                                                               | On testnet                                                                                                |
-| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| [IdRegistry](./src/core/IdRegistry.sol)                        | [0x0000002c243D1231dEfA58915324630AB5dBd4f4](https://basescan.org/address/0x0000002c243D1231dEfA58915324630AB5dBd4f4) | [Testnet block explorer](https://sepolia.basescan.org/address/0x0000002c243D1231dEfA58915324630AB5dBd4f4) |
-| [IdGateway](./src/core/IdGateway.sol)                          | [0x000000aA0d40b46F0A78d145c321a9DcfD154Ba7](https://basescan.org/address/0x000000aA0d40b46F0A78d145c321a9DcfD154Ba7) | [Testnet block explorer](https://sepolia.basescan.org/address/0x000000aA0d40b46F0A78d145c321a9DcfD154Ba7) |
-| [ProvenanceRegistry](./src/core/ProvenanceRegistry.sol)        | [0x0000009F840EeF8A92E533468A0Ef45a1987Da66](https://basescan.org/address/0x0000009F840EeF8A92E533468A0Ef45a1987Da66) | [Testnet block explorer](https://sepolia.basescan.org/address/0x0000009F840EeF8A92E533468A0Ef45a1987Da66) |
-| [ProvenanceGateway](./src/core/ProvenanceGateway.sol)          | [0x000000456Bb9Fd42ADd75F4b5c2247f47D45a0A2](https://basescan.org/address/0x000000456Bb9Fd42ADd75F4b5c2247f47D45a0A2) | [Testnet block explorer](https://sepolia.basescan.org/address/0x000000456Bb9Fd42ADd75F4b5c2247f47D45a0A2) |
-| [DelegateRegistry](./src/core/delegation/DelegateRegistry.sol) | [0x000000f1CABe81De9e020C9fac95318b14B80F14](https://basescan.org/address/0x000000f1CABe81De9e020C9fac95318b14B80F14) | [Testnet block explorer](https://sepolia.basescan.org/address/0x000000f1CABe81De9e020C9fac95318b14B80F14) |
+| Contract                                                  | Address                                                                                                               | On testnet                                                                                                |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| [IdRegistry](./src/IdRegistry.sol)                        | [0x0000002c243D1231dEfA58915324630AB5dBd4f4](https://basescan.org/address/0x0000002c243D1231dEfA58915324630AB5dBd4f4) | [Testnet block explorer](https://sepolia.basescan.org/address/0x0000002c243D1231dEfA58915324630AB5dBd4f4) |
+| [IdGateway](./src/IdGateway.sol)                          | [0x000000aA0d40b46F0A78d145c321a9DcfD154Ba7](https://basescan.org/address/0x000000aA0d40b46F0A78d145c321a9DcfD154Ba7) | [Testnet block explorer](https://sepolia.basescan.org/address/0x000000aA0d40b46F0A78d145c321a9DcfD154Ba7) |
+| [ProvenanceRegistry](./src/ProvenanceRegistry.sol)        | [0x0000009F840EeF8A92E533468A0Ef45a1987Da66](https://basescan.org/address/0x0000009F840EeF8A92E533468A0Ef45a1987Da66) | [Testnet block explorer](https://sepolia.basescan.org/address/0x0000009F840EeF8A92E533468A0Ef45a1987Da66) |
+| [ProvenanceGateway](./src/ProvenanceGateway.sol)          | [0x000000456Bb9Fd42ADd75F4b5c2247f47D45a0A2](https://basescan.org/address/0x000000456Bb9Fd42ADd75F4b5c2247f47D45a0A2) | [Testnet block explorer](https://sepolia.basescan.org/address/0x000000456Bb9Fd42ADd75F4b5c2247f47D45a0A2) |
+| [DelegateRegistry](./src/delegation/DelegateRegistry.sol) | [0x000000f1CABe81De9e020C9fac95318b14B80F14](https://basescan.org/address/0x000000f1CABe81De9e020C9fac95318b14B80F14) | [Testnet block explorer](https://sepolia.basescan.org/address/0x000000f1CABe81De9e020C9fac95318b14B80F14) |
 
 ### Sample Contracts
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IProvenanceRegistry} from "../../../src/core/interfaces/IProvenanceRegistry.sol";
+import {IProvenanceRegistry} from "../../../src/interfaces/IProvenanceRegistry.sol";
 import {ProvenanceTest} from "../ProvenanceTest.sol";
 import {ERC721Mock} from "../Utils.sol";
 
