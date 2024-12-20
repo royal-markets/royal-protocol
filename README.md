@@ -58,28 +58,6 @@ The v1.0 contracts are deployed on both Base Mainnet and Base Sepolia, to the sa
 | [ProvenanceGateway](./src/ProvenanceGateway.sol)          | [0x000000456Bb9Fd42ADd75F4b5c2247f47D45a0A2](https://basescan.org/address/0x000000456Bb9Fd42ADd75F4b5c2247f47D45a0A2) | [Testnet block explorer](https://sepolia.basescan.org/address/0x000000456Bb9Fd42ADd75F4b5c2247f47D45a0A2) |
 | [DelegateRegistry](./src/delegation/DelegateRegistry.sol) | [0x000000f1CABe81De9e020C9fac95318b14B80F14](https://basescan.org/address/0x000000f1CABe81De9e020C9fac95318b14B80F14) | [Testnet block explorer](https://sepolia.basescan.org/address/0x000000f1CABe81De9e020C9fac95318b14B80F14) |
 
-### Sample Contracts
-
-These extra contracts are included in this repo for use by service providers or other entities operating within the protocol.
-
-#### RecoveryProxy
-
-When users register for an account they can specify a recovery address that will be allowed to reset their address should they lose their custody wallet's passphrase.
-
-**[`RecoveryProxy`](./src/extra/RecoveryProxy.sol)** is a smart contract that can recover an account to a different address.
-
-The recovery address could also, for example, be a [multi-sig](https://safe.global/wallet) to enable [social recovery](https://wiki.polkadot.network/docs/kusama-social-recovery).
-
-For now, Royal's `RecoveryProxy` is deployed at address [`0x06428ebF3D4A6322611792BDf674EE2600e37E29`](https://basescan.org/address/0x06428ebF3D4A6322611792BDf674EE2600e37E29).
-_If_ you register for account recovery through our web interface, and lose your passphrase, we'll be able to reset your account's address.
-
-**Note:** If you are registering your account directly with the `IdGateway` contracts, do _not_ put this as a recovery address.
-Unless you registered through our web interface, we won't have any way to authenticate you and won't reset your address.
-
-#### RoyalProtocolAccount
-
-There are a few functions that would be useful to any contract attempting to interact with the Royal Protocol. **[`RoyalProtocolAccount`](./src/extra/RoyalProtocolAccount.sol)** is an abstract contract that any contract can inherit with logic for managing a Royal Protocol account (owned by a smart contract) and registering `ProvenanceClaim`s from a smart contract.
-
 ## Contributing
 
 Contributions are welcome!
