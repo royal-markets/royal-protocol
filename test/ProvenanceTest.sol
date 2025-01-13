@@ -3,17 +3,17 @@ pragma solidity ^0.8.0;
 
 import {console, Test} from "forge-std/Test.sol";
 
-import {IdGateway} from "../../src/IdGateway.sol";
-import {IdRegistry} from "../../src/IdRegistry.sol";
+import {IdGateway} from "../src/IdGateway.sol";
+import {IdRegistry} from "../src/IdRegistry.sol";
 
-import {ProvenanceGateway} from "../../src/ProvenanceGateway.sol";
-import {ProvenanceRegistry} from "../../src/ProvenanceRegistry.sol";
+import {ProvenanceGateway} from "../src/ProvenanceGateway.sol";
+import {ProvenanceRegistry} from "../src/ProvenanceRegistry.sol";
 
 import {LibString} from "solady/utils/LibString.sol";
 import {LibClone} from "solady/utils/LibClone.sol";
 
-import {DelegateRegistry} from "../../src/delegation/DelegateRegistry.sol";
-import {IDelegateRegistry} from "../../src/delegation/IDelegateRegistry.sol";
+import {DelegateRegistry} from "../src/delegation/DelegateRegistry.sol";
+import {IDelegateRegistry} from "../src/delegation/IDelegateRegistry.sol";
 
 import {ERC721Mock} from "./Utils.sol";
 

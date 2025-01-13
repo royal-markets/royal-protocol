@@ -3,11 +3,11 @@ pragma solidity ^0.8.0;
 
 import {Script, console} from "forge-std/Script.sol";
 
-import {IdRegistry} from "../../src/IdRegistry.sol";
-import {IdGateway} from "../../src/IdGateway.sol";
-import {ProvenanceRegistry} from "../../src/ProvenanceRegistry.sol";
-import {ProvenanceGateway} from "../../src/ProvenanceGateway.sol";
-import {DelegateRegistry} from "../../src/delegation/DelegateRegistry.sol";
+import {IdRegistry} from "../src/IdRegistry.sol";
+import {IdGateway} from "../src/IdGateway.sol";
+import {ProvenanceRegistry} from "../src/ProvenanceRegistry.sol";
+import {ProvenanceGateway} from "../src/ProvenanceGateway.sol";
+import {DelegateRegistry} from "../src/delegation/DelegateRegistry.sol";
 
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 
