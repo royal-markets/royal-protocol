@@ -84,10 +84,10 @@ contract AttestationRegistry is
     /* solhint-enable gas-small-strings */
 
     // The global schema registry.
-    ISchemaRegistry public immutable SCHEMA_REGISTRY;
+    ISchemaRegistry public schemaRegistry;
 
     // The global IdRegistry.
-    IIdRegistry public immutable ID_REGISTRY;
+    IIdRegistry public idRegistry;
 
     // The global mapping between attestations and their UIDs.
     mapping(bytes32 uid => Attestation attestation) private _db;
@@ -98,16 +98,28 @@ contract AttestationRegistry is
     // The global mapping between data and their revocation timestamps.
     mapping(uint256 revoker => mapping(bytes32 data => uint64 timestamp) timestamps) private _revocationsOffchain;
 
-    /// @dev Creates a new AttestationRegistry instance.
-    /// @param schemaRegistry_ The address of the global schema registry.
-    /// @param idRegistry_ The address of the global IdRegistry.
-    constructor(ISchemaRegistry schemaRegistry_, IIdRegistry idRegistry_) {
+    // =============================================================
+    //                    CONSTRUCTOR / INITIALIZATION
+    // =============================================================
+
+    constructor() {
+        _disableInitializers();
+    }
+
+    /// @inheritdoc IAttestationRegistry
+    function initialize(address initialOwner_, address schemaRegistry_, address idRegistry_)
+        external
+        override
+        initializer
+    {
+        _initializeOwner(initialOwner_);
+
         if (address(schemaRegistry_) == address(0) || address(idRegistry_) == address(0)) {
             revert InvalidRegistry();
         }
 
-        SCHEMA_REGISTRY = schemaRegistry_;
-        ID_REGISTRY = idRegistry_;
+        schemaRegistry = ISchemaRegistry(schemaRegistry_);
+        idRegistry = IIdRegistry(idRegistry_);
     }
 
     // =============================================================
@@ -150,7 +162,7 @@ contract AttestationRegistry is
         returns (bytes32 uid)
     {
         _verifyAttestSig(delegatedRequest);
-        uint256 registrar = ID_REGISTRY.idOf(msg.sender);
+        uint256 registrar = idRegistry.idOf(msg.sender);
 
         AttestationRequestData[] memory data = new AttestationRequestData[](1);
         data[0] = delegatedRequest.data;
@@ -263,7 +275,7 @@ contract AttestationRegistry is
                 }
 
                 // Process the current batch of attestations.
-                uint256 registrar = ID_REGISTRY.idOf(msg.sender);
+                uint256 registrar = idRegistry.idOf(msg.sender);
                 AttestationsResult memory res = _attest({
                     schemaUID: multiDelegatedRequest.schema,
                     data: data,
@@ -311,7 +323,7 @@ contract AttestationRegistry is
         RevocationRequestData[] memory data = new RevocationRequestData[](1);
         data[0] = delegatedRequest.data;
 
-        uint256 registrar = ID_REGISTRY.idOf(msg.sender);
+        uint256 registrar = idRegistry.idOf(msg.sender);
         _revoke({
             schemaUID: delegatedRequest.schema,
             data: data,
@@ -364,7 +376,7 @@ contract AttestationRegistry is
         uint256 availableValue = msg.value;
 
         uint256 length = multiDelegatedRequests.length;
-        uint256 registrar = ID_REGISTRY.idOf(msg.sender);
+        uint256 registrar = idRegistry.idOf(msg.sender);
         unchecked {
             for (uint256 i = 0; i < length; i++) {
                 MultiDelegatedRevocationRequest memory multiDelegatedRequest = multiDelegatedRequests[i];
@@ -438,8 +450,8 @@ contract AttestationRegistry is
 
     /// @inheritdoc IAttestationRegistry
     function canAttest(uint256 originator) public view override returns (uint256 registrar) {
-        registrar = ID_REGISTRY.idOf(msg.sender);
-        bool canAct = ID_REGISTRY.canAct(originator, registrar, address(this), "attest");
+        registrar = idRegistry.idOf(msg.sender);
+        bool canAct = idRegistry.canAct(originator, registrar, address(this), "attest");
 
         if (!canAct) {
             revert AccessDenied();
@@ -448,8 +460,8 @@ contract AttestationRegistry is
 
     /// @inheritdoc IAttestationRegistry
     function canRevoke(uint256 revoker) public view override returns (uint256 registrar) {
-        registrar = ID_REGISTRY.idOf(msg.sender);
-        bool canAct = ID_REGISTRY.canAct(revoker, registrar, address(this), "revoke");
+        registrar = idRegistry.idOf(msg.sender);
+        bool canAct = idRegistry.canAct(revoker, registrar, address(this), "revoke");
 
         if (!canAct) {
             revert AccessDenied();
@@ -513,7 +525,7 @@ contract AttestationRegistry is
         res.uids = new bytes32[](length);
 
         // Ensure that we aren't attempting to attest to a non-existing schema.
-        SchemaRecord memory schemaRecord = SCHEMA_REGISTRY.getSchema(schemaUID);
+        SchemaRecord memory schemaRecord = schemaRegistry.getSchema(schemaUID);
         if (schemaRecord.uid == EMPTY_UID) {
             revert InvalidSchema();
         }
@@ -590,7 +602,7 @@ contract AttestationRegistry is
         uint256 availableValue
     ) private returns (uint256 usedValue) {
         // Ensure that a non-existing schema ID wasn't passed by accident.
-        SchemaRecord memory schemaRecord = SCHEMA_REGISTRY.getSchema(schemaUID);
+        SchemaRecord memory schemaRecord = schemaRegistry.getSchema(schemaUID);
         if (schemaRecord.uid == EMPTY_UID) {
             revert InvalidSchema();
         }
@@ -860,7 +872,7 @@ contract AttestationRegistry is
     /// @dev Verify the EIP712 signature for a Attest transaction.
     function _verifyAttestSig(DelegatedAttestationRequest memory request) internal {
         uint256 originator = request.originator;
-        address custody = ID_REGISTRY.custodyOf(originator);
+        address custody = idRegistry.custodyOf(originator);
 
         AttestationRequestData memory data = request.data;
 
@@ -886,7 +898,7 @@ contract AttestationRegistry is
 
     function _verifyRevokeSig(DelegatedRevocationRequest memory request) internal {
         uint256 revoker = request.revoker;
-        address custody = ID_REGISTRY.custodyOf(revoker);
+        address custody = idRegistry.custodyOf(revoker);
 
         RevocationRequestData memory data = request.data;
 

@@ -6,9 +6,13 @@ import {ISchemaResolver} from "./schema-resolver/ISchemaResolver.sol";
 import {EMPTY_UID} from "./Common.sol";
 import {ISchemaRegistry, SchemaRecord} from "./interfaces/ISchemaRegistry.sol";
 
+import {Withdrawable} from "./abstract/Withdrawable.sol";
+import {Initializable} from "solady/utils/Initializable.sol";
+import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
+
 /// @title SchemaRegistry
 /// @notice The global schema registry.
-contract SchemaRegistry is ISchemaRegistry {
+contract SchemaRegistry is ISchemaRegistry, Withdrawable, Initializable, UUPSUpgradeable {
     error AlreadyExists();
 
     // The global mapping between schema records and their IDs.
@@ -20,8 +24,18 @@ contract SchemaRegistry is ISchemaRegistry {
     /// @notice The version of the schema registry.
     string public constant VERSION = "2025-01-06";
 
-    /// @dev Creates a new SchemaRegistry instance.
-    constructor() {}
+    // =============================================================
+    //                    CONSTRUCTOR / INITIALIZATION
+    // =============================================================
+
+    constructor() {
+        _disableInitializers();
+    }
+
+    /// @inheritdoc ISchemaRegistry
+    function initialize(address initialOwner_) external override initializer {
+        _initializeOwner(initialOwner_);
+    }
 
     /// @inheritdoc ISchemaRegistry
     function register(string calldata schema, ISchemaResolver resolver, bool revocable)
@@ -56,4 +70,11 @@ contract SchemaRegistry is ISchemaRegistry {
     function _getUID(SchemaRecord memory schemaRecord) private pure returns (bytes32) {
         return keccak256(abi.encodePacked(schemaRecord.schema, schemaRecord.resolver, schemaRecord.revocable));
     }
+
+    // =============================================================
+    //                          UUPS
+    // =============================================================
+
+    // solhint-disable-next-line no-empty-blocks
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

@@ -20,6 +20,10 @@ interface ISchemaRegistry {
     /// @param schema The schema data.
     event Registered(bytes32 indexed uid, address indexed registerer, SchemaRecord schema);
 
+    /// @dev Creates a new AttestationRegistry instance.
+    /// @param initialOwner_ The address of the initial owner.
+    function initialize(address initialOwner_) external;
+
     /// @notice Submits and reserves a new schema
     /// @param schema The schema data schema.
     /// @param resolver An optional schema resolver.

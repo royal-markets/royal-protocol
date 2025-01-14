@@ -117,6 +117,12 @@ interface IAttestationRegistry {
     /// @notice Returns the typehash of the EIP712 Revoke struct.
     function REVOKE_TYPEHASH() external pure returns (bytes32);
 
+    /// @dev Creates a new AttestationRegistry instance.
+    /// @param initialOwner_ The address of the initial owner.
+    /// @param schemaRegistry_ The address of the global schema registry.
+    /// @param idRegistry_ The address of the global IdRegistry.
+    function initialize(address initialOwner_, address schemaRegistry_, address idRegistry_) external;
+
     /* solhint-enable func-name-mixedcase */
 
     /// @notice Attests to a specific schema.
