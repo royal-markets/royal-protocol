@@ -10,6 +10,6 @@
     "coverage": "forge coverage --report lcov --ir-minimum && lcov --remove ./lcov.info -o ./lcov.info 'script/*' && genhtml lcov.info --branch-coverage --output-dir coverage && open coverage/index.html"
   },
   "devDependencies": {
-    "solhint": "^5.0.4"
+    "solhint": "^5.0.5"
   }
 }
