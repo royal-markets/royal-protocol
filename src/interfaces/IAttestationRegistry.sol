@@ -131,16 +131,19 @@ interface IAttestationRegistry {
     /// @return uid The UID of the new attestation.
     ///
     /// Example:
-    ///     attest({
-    ///         schema: "0facc36681cbe2456019c1b0d1e7bedd6d1d40f6f324bf3dd3a4cef2999200a0",
-    ///         data: {
-    ///             originatorId: 123,
-    ///             expirationTime: 0,
-    ///             revocable: true,
-    ///             data: "0xF00D",
-    ///             value: 0
+    ///     attest(
+    ///         originator: 123,
+    ///         request: {
+    ///             schema: "0facc36681cbe2456019c1b0d1e7bedd6d1d40f6f324bf3dd3a4cef2999200a0",
+    ///             data: {
+    ///                 originatorId: 123,
+    ///                 expirationTime: 0,
+    ///                 revocable: true,
+    ///                 data: "0xF00D",
+    ///                 value: 0
+    ///             }
     ///         }
-    ///     })
+    ///     )
     function attest(uint256 originator, AttestationRequest calldata request) external payable returns (bytes32 uid);
 
     /// @notice Attests to a specific schema via the provided ECDSA signature.

@@ -16,13 +16,14 @@ struct SchemaRecord {
 interface ISchemaRegistry {
     /// @notice Emitted when a new schema has been registered
     /// @param uid The schema UID.
-    /// @param registerer The address of the account used to register the schema.
+    /// @param originator The AccountID of the account used to register the schema.
     /// @param schema The schema data.
-    event Registered(bytes32 indexed uid, address indexed registerer, SchemaRecord schema);
+    event Registered(bytes32 indexed uid, uint256 indexed originator, SchemaRecord schema);
 
     /// @dev Creates a new AttestationRegistry instance.
     /// @param initialOwner_ The address of the initial owner.
-    function initialize(address initialOwner_) external;
+    /// @param idRegistry_ The address of the global ID registry.
+    function initialize(address initialOwner_, address idRegistry_) external;
 
     /// @notice Submits and reserves a new schema
     /// @param schema The schema data schema.

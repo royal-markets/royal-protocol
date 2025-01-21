@@ -5,6 +5,7 @@ import {ISchemaResolver} from "./schema-resolver/ISchemaResolver.sol";
 
 import {EMPTY_UID} from "./Common.sol";
 import {ISchemaRegistry, SchemaRecord} from "./interfaces/ISchemaRegistry.sol";
+import {IIdRegistry} from "./interfaces/IIdRegistry.sol";
 
 import {Withdrawable} from "./abstract/Withdrawable.sol";
 import {Initializable} from "solady/utils/Initializable.sol";
@@ -14,6 +15,10 @@ import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 /// @notice The global schema registry.
 contract SchemaRegistry is ISchemaRegistry, Withdrawable, Initializable, UUPSUpgradeable {
     error AlreadyExists();
+    error InvalidRegistry();
+
+    // The global IdRegistry.
+    IIdRegistry public idRegistry;
 
     // The global mapping between schema records and their IDs.
     mapping(bytes32 uid => SchemaRecord schemaRecord) private _registry;
@@ -33,8 +38,14 @@ contract SchemaRegistry is ISchemaRegistry, Withdrawable, Initializable, UUPSUpg
     }
 
     /// @inheritdoc ISchemaRegistry
-    function initialize(address initialOwner_) external override initializer {
+    function initialize(address initialOwner_, address idRegistry_) external override initializer {
         _initializeOwner(initialOwner_);
+
+        if (address(idRegistry_) == address(0)) {
+            revert InvalidRegistry();
+        }
+
+        idRegistry = IIdRegistry(idRegistry_);
     }
 
     /// @inheritdoc ISchemaRegistry
@@ -54,7 +65,8 @@ contract SchemaRegistry is ISchemaRegistry, Withdrawable, Initializable, UUPSUpg
         schemaRecord.uid = uid;
         _registry[uid] = schemaRecord;
 
-        emit Registered(uid, msg.sender, schemaRecord);
+        uint256 accountId = idRegistry.idOf(msg.sender);
+        emit Registered(uid, accountId, schemaRecord);
 
         return uid;
     }
