@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {ProvenanceTest} from "../ProvenanceTest.sol";
 
-import {IdRegistry} from "../../../src/IdRegistry.sol";
+import {IdRegistry} from "../../src/IdRegistry.sol";
 
 import {LibClone} from "solady/utils/LibClone.sol";
 
