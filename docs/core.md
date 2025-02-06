@@ -20,7 +20,7 @@ struct User {
 }
 ```
 
-Once users have registered accounts, they can register a `ProvenanceClaim`, an attestation that a certain Royal Protocol account is the creator of a certain work (identified by hash).
+Once users have registered accounts, they can register a `ProvenanceClaim`, an record that a certain Royal Protocol account is the creator of a certain work (identified by hash).
 Users can register works while specifying themselves as the author.
 They can also register works on behalf of a different author; this enables digital creative tools to register works on behalf of its users (provided both user and registrar have a Royal Protocol account).
 

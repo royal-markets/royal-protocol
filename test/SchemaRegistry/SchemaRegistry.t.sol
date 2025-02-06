@@ -2,8 +2,8 @@
 pragma solidity ^0.8.0;
 
 import {ISchemaResolver} from "../../src/schema-resolver/ISchemaResolver.sol";
-import {AttestationRequest, Attestation, AttestationRequestData} from "../../src/interfaces/IAttestationRegistry.sol";
-import {FieldDefinition, FieldType, SchemaRecord} from "../../src/interfaces/ISchemaRegistry.sol";
+import {RecordRequest, Record, RecordRequestData} from "../../src/interfaces/IRecordRegistry.sol";
+import {FieldDefinition, FieldType, Schema} from "../../src/interfaces/ISchemaRegistry.sol";
 import {ProvenanceTest} from "../ProvenanceTest.sol";
 
 contract SchemaRegistryTest is ProvenanceTest {
@@ -16,7 +16,7 @@ contract SchemaRegistryTest is ProvenanceTest {
     event SchemaUpdated(bytes32 indexed uid, uint256 numAddedFields);
     event SchemaFieldUpdated(bytes32 indexed uid, uint256 indexed fieldIndex);
 
-    // Attestations
+    // Records
     event Attested(uint256 indexed originator, uint256 indexed registrar, bytes32 uid, bytes32 indexed schemaUID);
 
     // =============================================================
@@ -94,28 +94,37 @@ contract SchemaRegistryTest is ProvenanceTest {
         });
 
         // Define a simple ProfileData schema
-        SchemaRecord memory schemaRecord = SchemaRecord({
-            uid: bytes32(0),
-            ownerId: originatorId,
-            resolver: ISchemaResolver(address(0)),
-            revocable: true,
-            appendable: true,
-            fields: fields
-        });
+        string memory name = "Profile Data";
+        // Schema memory profileData = Schema({
+        //     uid: bytes32(0),
+        //     ownerId: originatorId,
+        //     name: name,
+        //     fields: fields,
+        //     resolver: ISchemaResolver(address(0)),
+        //     revocable: true,
+        //     updatable: true
+        // });
 
-        bytes32 expectedUID = _getSchemaUID(schemaRecord);
+        bytes32 expectedUID = _getSchemaUID(originatorId, name, bytes32(0));
 
         // Register the schema
         vm.expectEmit();
         emit SchemaRegistered({uid: expectedUID, originator: originatorId});
 
         vm.prank(custody);
-        bytes32 schemaUID = schemaRegistry.register(fields, ISchemaResolver(address(0)), true, true);
+        bytes32 schemaUID = schemaRegistry.register({
+            name: name,
+            fields: fields,
+            revocable: true,
+            updatable: true,
+            resolver: ISchemaResolver(address(0)),
+            salt: bytes32(0)
+        });
 
         // Assert postconditions
         assertEq(schemaUID, expectedUID);
 
-        SchemaRecord memory schema = schemaRegistry.getSchema(schemaUID);
+        Schema memory schema = schemaRegistry.getSchema(schemaUID);
         assertEq(schema.uid, expectedUID);
         assertEq(address(schema.resolver), address(0));
         assertEq(schema.revocable, true);
@@ -153,41 +162,35 @@ contract SchemaRegistryTest is ProvenanceTest {
         // Write a record using this new schema
         bytes memory data = abi.encode(originatorId, "Alice", "https://example.com/alice.jpg", 1);
 
-        AttestationRequest memory attestationRequest = AttestationRequest({
+        RecordRequest memory recordRequest = RecordRequest({
             // TODO: Fix the naming mismatch here? (schema vs schemaUID?)
             schema: schemaUID,
-            data: AttestationRequestData({expirationTime: 0, revocable: true, data: data, value: 0})
+            data: RecordRequestData({revocable: true, updatable: true, data: data, salt: bytes32(0), value: 0})
         });
 
-        bytes32 expectedAttestationUID = _getAttestationUID(originatorId, originatorId, attestationRequest);
+        bytes32 expectedRecordUID = _getRecordUID(originatorId, originatorId, recordRequest);
         vm.expectEmit();
-        emit Attested({
-            originator: originatorId,
-            registrar: originatorId,
-            uid: expectedAttestationUID,
-            schemaUID: schemaUID
-        });
+        emit Attested({originator: originatorId, registrar: originatorId, uid: expectedRecordUID, schemaUID: schemaUID});
 
         vm.prank(custody);
-        bytes32 attestationUID = attestationRegistry.attest(originatorId, attestationRequest);
+        bytes32 recordUID = recordRegistry.register(originatorId, recordRequest);
 
         // Assert postconditions
-        assertEq(attestationUID, expectedAttestationUID);
-        Attestation memory attestation = attestationRegistry.getAttestation(attestationUID);
-        assertEq(attestation.uid, expectedAttestationUID);
-        assertEq(attestation.schema, schemaUID);
-        assertEq(attestation.time, block.timestamp);
-        assertEq(attestation.expirationTime, 0);
-        assertEq(attestation.revocationTime, 0);
-        assertEq(attestation.originator, originatorId);
-        assertEq(attestation.registrar, originatorId);
-        assertEq(attestation.revocable, true);
-        assertEq(attestation.data, data);
+        assertEq(recordUID, expectedRecordUID);
+        Record memory record = recordRegistry.getRecord(recordUID);
+        assertEq(record.uid, expectedRecordUID);
+        assertEq(record.schema, schemaUID);
+        assertEq(record.time, block.timestamp);
+        assertEq(record.revocationTime, 0);
+        assertEq(record.originator, originatorId);
+        assertEq(record.registrar, originatorId);
+        assertEq(record.revocable, true);
+        assertEq(record.data, data);
 
-        (uint256 accountId, string memory name, string memory photoURI, uint8 gender) =
-            abi.decode(attestation.data, (uint256, string, string, uint8));
+        (uint256 accountId, string memory displayName, string memory photoURI, uint8 gender) =
+            abi.decode(record.data, (uint256, string, string, uint8));
         assertEq(accountId, originatorId);
-        assertEq(name, "Alice");
+        assertEq(displayName, "Alice");
         assertEq(photoURI, "https://example.com/alice.jpg");
         assertEq(genderEnum[gender], "female");
     }
@@ -218,7 +221,14 @@ contract SchemaRegistryTest is ProvenanceTest {
         });
 
         vm.prank(custody);
-        bytes32 schemaUID = schemaRegistry.register(fields, ISchemaResolver(address(0)), true, true);
+        bytes32 schemaUID = schemaRegistry.register({
+            name: "schema1",
+            fields: fields,
+            revocable: true,
+            updatable: true,
+            resolver: ISchemaResolver(address(0)),
+            salt: bytes32(0)
+        });
 
         // Append a new field
         FieldDefinition[] memory newFields = new FieldDefinition[](1);
@@ -237,7 +247,7 @@ contract SchemaRegistryTest is ProvenanceTest {
         schemaRegistry.appendFields(schemaUID, newFields);
 
         // Assert postconditions
-        SchemaRecord memory schema = schemaRegistry.getSchema(schemaUID);
+        Schema memory schema = schemaRegistry.getSchema(schemaUID);
         assertEq(schema.fields.length, 2);
 
         assertEq(schema.fields[0].fieldName, "field1");
@@ -274,7 +284,14 @@ contract SchemaRegistryTest is ProvenanceTest {
         });
 
         vm.prank(custody);
-        bytes32 schemaUID = schemaRegistry.register(fields, ISchemaResolver(address(0)), true, true);
+        bytes32 schemaUID = schemaRegistry.register({
+            name: "schema1",
+            fields: fields,
+            revocable: true,
+            updatable: true,
+            resolver: ISchemaResolver(address(0)),
+            salt: bytes32(0)
+        });
 
         // Append a new enum value
         string[] memory newEnumValues = new string[](1);
@@ -287,7 +304,7 @@ contract SchemaRegistryTest is ProvenanceTest {
         schemaRegistry.appendEnumValues(schemaUID, 0, newEnumValues);
 
         // Assert postconditions
-        SchemaRecord memory schema = schemaRegistry.getSchema(schemaUID);
+        Schema memory schema = schemaRegistry.getSchema(schemaUID);
         assertEq(schema.fields[0].enumValues.length, 2);
         assertEq(schema.fields[0].enumValues[0], string(abi.encodePacked(enumValue1)));
         assertEq(schema.fields[0].enumValues[1], string(abi.encodePacked(enumValue2)));
@@ -297,6 +314,7 @@ contract SchemaRegistryTest is ProvenanceTest {
         // Bound inputs that need to be bound
         vm.assume(custody1 != address(0));
         vm.assume(custody2 != address(0));
+        vm.assume(custody1 != custody2);
 
         // Register a Royal account for the wallet addresses.
         _register(custody1, "username1");
@@ -313,10 +331,24 @@ contract SchemaRegistryTest is ProvenanceTest {
         });
 
         vm.prank(custody1);
-        bytes32 schemaUID1 = schemaRegistry.register(fields, ISchemaResolver(address(0)), true, true);
+        bytes32 schemaUID1 = schemaRegistry.register({
+            name: "schema1",
+            fields: fields,
+            revocable: true,
+            updatable: true,
+            resolver: ISchemaResolver(address(0)),
+            salt: bytes32(0)
+        });
 
         vm.prank(custody2);
-        bytes32 schemaUID2 = schemaRegistry.register(fields, ISchemaResolver(address(0)), true, true);
+        bytes32 schemaUID2 = schemaRegistry.register({
+            name: "schema2",
+            fields: fields,
+            revocable: true,
+            updatable: true,
+            resolver: ISchemaResolver(address(0)),
+            salt: bytes32(0)
+        });
 
         // Define and register actual schema
         bytes32[] memory allowedSchemaIds = new bytes32[](1);
@@ -331,7 +363,14 @@ contract SchemaRegistryTest is ProvenanceTest {
         });
 
         vm.prank(custody1);
-        bytes32 schemaUID = schemaRegistry.register(fields, ISchemaResolver(address(0)), true, true);
+        bytes32 schemaUID = schemaRegistry.register({
+            name: "schema1",
+            fields: fields,
+            revocable: true,
+            updatable: true,
+            resolver: ISchemaResolver(address(0)),
+            salt: bytes32(0)
+        });
 
         // Append a new allowed schema ID
         bytes32[] memory newAllowedSchemaIds = new bytes32[](1);
@@ -344,7 +383,7 @@ contract SchemaRegistryTest is ProvenanceTest {
         schemaRegistry.appendAllowedSchemaIds(schemaUID, 0, newAllowedSchemaIds);
 
         // Assert postconditions
-        SchemaRecord memory schema = schemaRegistry.getSchema(schemaUID);
+        Schema memory schema = schemaRegistry.getSchema(schemaUID);
         assertEq(schema.fields[0].allowedSchemaIds.length, 2);
         assertEq(schema.fields[0].allowedSchemaIds[0], schemaUID1);
         assertEq(schema.fields[0].allowedSchemaIds[1], schemaUID2);
@@ -399,33 +438,15 @@ contract SchemaRegistryTest is ProvenanceTest {
     //     assertEq(provenanceClaim.blockNumber, block.number);
     // }
 
-    function _getSchemaUID(SchemaRecord memory schemaRecord) internal pure returns (bytes32) {
-        return keccak256(
-            abi.encode(
-                schemaRecord.ownerId,
-                schemaRecord.fields,
-                schemaRecord.resolver,
-                schemaRecord.revocable,
-                schemaRecord.appendable
-            )
-        );
+    function _getSchemaUID(uint256 originatorId, string memory name, bytes32 salt) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(originatorId, name, salt));
     }
 
-    function _getAttestationUID(uint256 originator, uint256 registrar, AttestationRequest memory attestationRequest)
+    function _getRecordUID(uint256 originator, uint256 registrar, RecordRequest memory recordRequest)
         internal
-        view
+        pure
         returns (bytes32 uid)
     {
-        return keccak256(
-            abi.encodePacked(
-                attestationRequest.schema,
-                uint64(block.timestamp),
-                attestationRequest.data.expirationTime,
-                originator,
-                registrar,
-                attestationRequest.data.revocable,
-                attestationRequest.data.data
-            )
-        );
+        return keccak256(abi.encodePacked(originator, registrar, recordRequest.schema, recordRequest.data.data));
     }
 }

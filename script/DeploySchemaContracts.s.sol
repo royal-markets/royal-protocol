@@ -4,10 +4,10 @@ pragma solidity ^0.8.0;
 import {Script, console} from "forge-std/Script.sol";
 
 import {SchemaRegistry} from "../src/SchemaRegistry.sol";
-import {AttestationRegistry} from "../src/AttestationRegistry.sol";
+import {RecordRegistry} from "../src/RecordRegistry.sol";
 
 import {FieldDefinition, FieldType, ISchemaResolver} from "../src/interfaces/ISchemaRegistry.sol";
-import {AttestationRequest, AttestationRequestData} from "../src/interfaces/IAttestationRegistry.sol";
+import {RecordRequest, RecordRequestData} from "../src/interfaces/IRecordRegistry.sol";
 import {IIdRegistry} from "../src/interfaces/IIdRegistry.sol";
 
 import {LibClone} from "solady/utils/LibClone.sol";
@@ -23,14 +23,14 @@ contract DeployProtocolContracts is Script {
     // =============================================================
 
     // NOTE: Get initcode hashes from CalculateSalts script, and then salts from maldon (or create2crunch/cast).
-    bytes32 schemaRegistrySalt = bytes32(uint256(1));
-    bytes32 attestationRegistrySalt = bytes32(uint256(1));
+    bytes32 schemaRegistrySalt = bytes32(uint256(2));
+    bytes32 recordRegistrySalt = bytes32(uint256(2));
 
-    bytes32 schemaRegistryProxySalt = bytes32(uint256(1));
-    bytes32 attestationRegistryProxySalt = bytes32(uint256(1));
+    bytes32 schemaRegistryProxySalt = bytes32(uint256(2));
+    bytes32 recordRegistryProxySalt = bytes32(uint256(2));
 
     // NOTE: Double-check addresses?
-    address public constant ID_REGISTRY_ADDR = 0x0000002c243D1231dEfA58915324630AB5dBd4f4;
+    IIdRegistry public constant ID_REGISTRY = IIdRegistry(0x0000002c243D1231dEfA58915324630AB5dBd4f4);
 
     address public constant OWNER = 0x62Bd6bD77403268E387a8c7e09aF5D3127186be8;
 
@@ -49,7 +49,7 @@ contract DeployProtocolContracts is Script {
         address schemaRegistryImplementation = address(new SchemaRegistry{salt: schemaRegistrySalt}());
         SchemaRegistry schemaRegistry =
             SchemaRegistry(LibClone.deployDeterministicERC1967(schemaRegistryImplementation, schemaRegistryProxySalt));
-        schemaRegistry.initialize(OWNER, ID_REGISTRY_ADDR);
+        schemaRegistry.initialize(ID_REGISTRY, OWNER);
         console.log("SchemaRegistry address: %s", address(schemaRegistry));
         vm.stopBroadcast();
 
@@ -64,84 +64,51 @@ contract DeployProtocolContracts is Script {
         });
 
         fields[1] = FieldDefinition({
-            fieldName: "name",
+            fieldName: "description",
             fieldType: FieldType.STRING,
             isArray: false,
             allowedSchemaIds: new bytes32[](0),
             enumValues: new string[](0)
         });
 
-        // Register Schema#1 - Name
+        // Register Schema#1 - Description
         vm.startBroadcast();
-        bytes32 nameSchemaUID = schemaRegistry.register(fields, ISchemaResolver(address(0)), true, false);
-        vm.stopBroadcast();
-
-        // Register Schema#2 - Description
-        fields[1].fieldName = "description";
-        vm.startBroadcast();
-        bytes32 descriptionSchemaUID = schemaRegistry.register(fields, ISchemaResolver(address(0)), true, false);
-        vm.stopBroadcast();
-
-        // Deploy AttestationRegistry
-        vm.startBroadcast();
-        address attestationRegistryImplementation = address(new AttestationRegistry{salt: attestationRegistrySalt}());
-        AttestationRegistry attestationRegistry = AttestationRegistry(
-            LibClone.deployDeterministicERC1967(attestationRegistryImplementation, attestationRegistryProxySalt)
-        );
-        attestationRegistry.initialize(OWNER, address(schemaRegistry), ID_REGISTRY_ADDR);
-        console.log("AttestationRegistry address: %s", address(attestationRegistry));
-        vm.stopBroadcast();
-
-        // Setup Attestations for Name/Description for Schema#1 and Schema#2
-        AttestationRequest memory nameNameAttestationRequest = AttestationRequest({
-            schema: nameSchemaUID,
-            data: AttestationRequestData({
-                expirationTime: 0,
-                revocable: false,
-                data: abi.encode(nameSchemaUID, "Schema Name"),
-                value: 0
-            })
+        bytes32 descriptionSchemaUID = schemaRegistry.register({
+            name: "Schema Description",
+            fields: fields,
+            revocable: false,
+            updatable: true,
+            resolver: ISchemaResolver(address(0)),
+            salt: bytes32(0)
         });
+        vm.stopBroadcast();
 
-        AttestationRequest memory descriptionNameAttestationRequest = AttestationRequest({
-            schema: nameSchemaUID,
-            data: AttestationRequestData({
-                expirationTime: 0,
-                revocable: false,
-                data: abi.encode(descriptionSchemaUID, "Schema Description"),
-                value: 0
-            })
-        });
+        // Deploy RecordRegistry
+        vm.startBroadcast();
+        address recordRegistryImplementation = address(new RecordRegistry{salt: recordRegistrySalt}());
+        RecordRegistry recordRegistry =
+            RecordRegistry(LibClone.deployDeterministicERC1967(recordRegistryImplementation, recordRegistryProxySalt));
+        recordRegistry.initialize(schemaRegistry, ID_REGISTRY, OWNER);
+        console.log("RecordRegistry address: %s", address(recordRegistry));
+        vm.stopBroadcast();
 
-        AttestationRequest memory nameDescriptionAttestationRequest = AttestationRequest({
+        // Setup Record for a Description for Schema#1
+        RecordRequest memory descriptionDescriptionRecordRequest = RecordRequest({
             schema: descriptionSchemaUID,
-            data: AttestationRequestData({
-                expirationTime: 0,
+            data: RecordRequestData({
                 revocable: false,
-                data: abi.encode(nameSchemaUID, "A descriptive name of the schema."),
-                value: 0
-            })
-        });
-
-        AttestationRequest memory descriptionDescriptionAttestationRequest = AttestationRequest({
-            schema: descriptionSchemaUID,
-            data: AttestationRequestData({
-                expirationTime: 0,
-                revocable: false,
+                updatable: true,
                 data: abi.encode(descriptionSchemaUID, "A descriptive description of the schema."),
+                salt: bytes32(0),
                 value: 0
             })
         });
 
-        // Attest to the names/descriptions of the canonical "Schema Name" and "Schema Description"
-        IIdRegistry idRegistry = IIdRegistry(ID_REGISTRY_ADDR);
-        uint256 accountId = idRegistry.idOf(OWNER);
+        // Attest to the description of the canonical "Schema Description"
+        uint256 accountId = ID_REGISTRY.idOf(OWNER);
 
         vm.startBroadcast();
-        attestationRegistry.attest(accountId, nameNameAttestationRequest);
-        attestationRegistry.attest(accountId, descriptionNameAttestationRequest);
-        attestationRegistry.attest(accountId, nameDescriptionAttestationRequest);
-        attestationRegistry.attest(accountId, descriptionDescriptionAttestationRequest);
+        recordRegistry.register(accountId, descriptionDescriptionRecordRequest);
         vm.stopBroadcast();
     }
 }

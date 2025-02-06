@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {ISchemaResolver} from "./schema-resolver/ISchemaResolver.sol";
 
-import {AccessDenied, NotFound, Signature, EMPTY_UID, InvalidLength, NotFound, NO_EXPIRATION_TIME} from "./Common.sol";
+import {AccessDenied, NotFound, Signature, EMPTY_UID, InvalidLength, NotFound} from "./Common.sol";
 
 import {Withdrawable} from "./abstract/Withdrawable.sol";
 import {Signatures} from "./abstract/Signatures.sol";
@@ -13,54 +13,48 @@ import {Initializable} from "solady/utils/Initializable.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 
 import {
-    Attestation,
-    AttestationRequest,
-    AttestationRequestData,
-    DelegatedAttestationRequest,
+    Record,
+    RecordRequest,
+    RecordRequestData,
+    DelegatedRecordRequest,
     DelegatedRevocationRequest,
-    IAttestationRegistry,
-    MultiAttestationRequest,
-    MultiDelegatedAttestationRequest,
+    IRecordRegistry,
+    MultiRecordRequest,
+    MultiDelegatedRecordRequest,
     MultiDelegatedRevocationRequest,
     MultiRevocationRequest,
     RevocationRequest,
     RevocationRequestData
-} from "./interfaces/IAttestationRegistry.sol";
+} from "./interfaces/IRecordRegistry.sol";
 
-import {ISchemaRegistry, SchemaRecord} from "./interfaces/ISchemaRegistry.sol";
+import {ISchemaRegistry, Schema} from "./interfaces/ISchemaRegistry.sol";
 import {IIdRegistry} from "./interfaces/IIdRegistry.sol";
 
-/// @title AttestationRegistry
-/// @notice The AttestationRegistry for protocol SchemaData.
-contract AttestationRegistry is
-    IAttestationRegistry,
-    Withdrawable,
-    Signatures,
-    EIP712,
-    Nonces,
-    Initializable,
-    UUPSUpgradeable
-{
+// TODO: Add a way to reverse a revocation
+/// @title RecordRegistry
+/// @notice The RecordRegistry for protocol SchemaData.
+contract RecordRegistry is IRecordRegistry, Withdrawable, Signatures, EIP712, Nonces, Initializable, UUPSUpgradeable {
     error AlreadyRevoked();
     error AlreadyRevokedOffchain();
     error AlreadyTimestamped();
-    error AlreadyAttested();
+    error AlreadyRegistered();
     error InsufficientValue();
-    error InvalidAttestation();
-    error InvalidAttestations();
-    error InvalidExpirationTime();
+    error InvalidAccount();
+    error InvalidRecord();
+    error InvalidRecords();
     error InvalidRegistry();
     error InvalidRevocation();
     error InvalidRevocations();
     error InvalidSchema();
     error Irrevocable();
+    error Nonupdatable();
     error NotPayable();
     error RefundFailed();
 
-    /// @notice A struct representing an internal attestation result.
-    struct AttestationsResult {
+    /// @notice A struct representing an internal record result.
+    struct RecordsResult {
         uint256 usedValue; // Total ETH amount that was sent to resolvers.
-        bytes32[] uids; // UIDs of the new attestations.
+        bytes32[] uids; // UIDs of the new records.
     }
 
     // =============================================================
@@ -69,15 +63,15 @@ contract AttestationRegistry is
 
     /* solhint-disable gas-small-strings */
 
-    /// @inheritdoc IAttestationRegistry
-    string public constant VERSION = "2025-01-06";
+    /// @inheritdoc IRecordRegistry
+    string public constant VERSION = "2025-02-04";
 
-    /// @inheritdoc IAttestationRegistry
-    bytes32 public constant ATTEST_TYPEHASH = keccak256(
-        "Attest(uint256 originator,bytes32 schema,uint64 expirationTime,bool revocable,bytes data,uint256 value,uint256 nonce,uint256 deadline)"
+    /// @inheritdoc IRecordRegistry
+    bytes32 public constant REGISTER_TYPEHASH = keccak256(
+        "Register(uint256 originator,bytes32 schema,bool revocable,bool updatable,bytes data,uint256 value,uint256 nonce,uint256 deadline)"
     );
 
-    /// @inheritdoc IAttestationRegistry
+    /// @inheritdoc IRecordRegistry
     bytes32 public constant REVOKE_TYPEHASH =
         keccak256("Revoke(uint256 revoker,bytes32 schema,bytes32 uid,uint256 value,uint256 nonce,uint256 deadline)");
 
@@ -89,14 +83,14 @@ contract AttestationRegistry is
     // The global IdRegistry.
     IIdRegistry public idRegistry;
 
-    // The global mapping between attestations and their UIDs.
-    mapping(bytes32 uid => Attestation attestation) private _db;
+    // The global mapping between records and their UIDs.
+    mapping(bytes32 uid => Record record) internal _db;
 
     // The global mapping between data and their timestamps.
-    mapping(bytes32 data => uint64 timestamp) private _timestamps;
+    mapping(bytes32 data => uint64 timestamp) internal _timestamps;
 
     // The global mapping between data and their revocation timestamps.
-    mapping(uint256 revoker => mapping(bytes32 data => uint64 timestamp) timestamps) private _revocationsOffchain;
+    mapping(uint256 revoker => mapping(bytes32 data => uint64 timestamp) timestamps) internal _revocationsOffchain;
 
     // =============================================================
     //                    CONSTRUCTOR / INITIALIZATION
@@ -106,20 +100,15 @@ contract AttestationRegistry is
         _disableInitializers();
     }
 
-    /// @inheritdoc IAttestationRegistry
-    function initialize(address initialOwner_, address schemaRegistry_, address idRegistry_)
+    /// @inheritdoc IRecordRegistry
+    function initialize(ISchemaRegistry schemaRegistry_, IIdRegistry idRegistry_, address initialOwner_)
         external
         override
         initializer
     {
+        schemaRegistry = schemaRegistry_;
+        idRegistry = idRegistry_;
         _initializeOwner(initialOwner_);
-
-        if (address(schemaRegistry_) == address(0) || address(idRegistry_) == address(0)) {
-            revert InvalidRegistry();
-        }
-
-        schemaRegistry = ISchemaRegistry(schemaRegistry_);
-        idRegistry = IIdRegistry(idRegistry_);
     }
 
     // =============================================================
@@ -129,23 +118,23 @@ contract AttestationRegistry is
     /// @dev Configure the EIP712 name and version for the domain separator.
     function _domainNameAndVersion() internal pure override returns (string memory name, string memory version) {
         // solhint-disable-next-line gas-small-strings
-        name = "RoyalProtocol_AttestationRegistry";
+        name = "RoyalProtocol_RecordRegistry";
         version = "1";
     }
 
-    /// @inheritdoc IAttestationRegistry
-    function attest(uint256 originator, AttestationRequest calldata request)
+    /// @inheritdoc IRecordRegistry
+    function register(uint256 originator, RecordRequest calldata request)
         external
         payable
         override
         returns (bytes32 uid)
     {
-        uint256 registrar = canAttest(originator);
+        uint256 registrar = canRegister(originator);
 
-        AttestationRequestData[] memory data = new AttestationRequestData[](1);
+        RecordRequestData[] memory data = new RecordRequestData[](1);
         data[0] = request.data;
 
-        return _attest({
+        return _register({
             schemaUID: request.schema,
             data: data,
             originator: originator,
@@ -154,20 +143,20 @@ contract AttestationRegistry is
         }).uids[0];
     }
 
-    /// @inheritdoc IAttestationRegistry
-    function attestByDelegation(DelegatedAttestationRequest calldata delegatedRequest)
+    /// @inheritdoc IRecordRegistry
+    function registerByDelegation(DelegatedRecordRequest calldata delegatedRequest)
         external
         payable
         override
         returns (bytes32 uid)
     {
-        _verifyAttestSig(delegatedRequest);
+        _verifyRegisterSig(delegatedRequest);
         uint256 registrar = idRegistry.idOf(msg.sender);
 
-        AttestationRequestData[] memory data = new AttestationRequestData[](1);
+        RecordRequestData[] memory data = new RecordRequestData[](1);
         data[0] = delegatedRequest.data;
 
-        return _attest({
+        return _register({
             schemaUID: delegatedRequest.schema,
             data: data,
             originator: delegatedRequest.originator,
@@ -176,14 +165,14 @@ contract AttestationRegistry is
         }).uids[0];
     }
 
-    /// @inheritdoc IAttestationRegistry
-    function multiAttest(uint256 originator, MultiAttestationRequest[] calldata multiRequests)
+    /// @inheritdoc IRecordRegistry
+    function multiRegister(uint256 originator, MultiRecordRequest[] calldata multiRequests)
         external
         payable
         override
         returns (bytes32[] memory)
     {
-        // Since a multi-attest call is going to make multiple attestations for multiple schemas, we'd need to collect
+        // Since a multi-register call is going to make multiple records for multiple schemas, we'd need to collect
         // all the returned UIDs into a single list.
         uint256 length = multiRequests.length;
         bytes32[][] memory totalUIDs = new bytes32[][](length);
@@ -194,19 +183,19 @@ contract AttestationRegistry is
         // some ETH was stuck in the contract by accident (which shouldn't happen in normal conditions), it won't be
         // possible to send too much ETH anyway.
         uint256 availableValue = msg.value;
-        uint256 registrar = canAttest(originator);
+        uint256 registrar = canRegister(originator);
 
         unchecked {
             for (uint256 i = 0; i < length; i++) {
-                // Process the current batch of attestations.
-                MultiAttestationRequest calldata multiRequest = multiRequests[i];
+                // Process the current batch of records.
+                MultiRecordRequest calldata multiRequest = multiRequests[i];
 
                 // Ensure that data isn't empty.
                 if (multiRequest.data.length == 0) {
                     revert InvalidLength();
                 }
 
-                AttestationsResult memory res = _attest({
+                RecordsResult memory res = _register({
                     schemaUID: multiRequest.schema,
                     data: multiRequest.data,
                     originator: originator,
@@ -231,14 +220,14 @@ contract AttestationRegistry is
         return _mergeUIDs(totalUIDs, totalUIDCount);
     }
 
-    /// @inheritdoc IAttestationRegistry
-    function multiAttestByDelegation(MultiDelegatedAttestationRequest[] calldata multiDelegatedRequests)
+    /// @inheritdoc IRecordRegistry
+    function multiRegisterByDelegation(MultiDelegatedRecordRequest[] calldata multiDelegatedRequests)
         external
         payable
         override
         returns (bytes32[] memory)
     {
-        // Since a multi-attest call is going to make multiple attestations for multiple schemas, we'd need to collect
+        // Since a multi-register call is going to make multiple records for multiple schemas, we'd need to collect
         // all the returned UIDs into a single list.
         uint256 length = multiDelegatedRequests.length;
         bytes32[][] memory totalUIDs = new bytes32[][](length);
@@ -252,8 +241,8 @@ contract AttestationRegistry is
 
         unchecked {
             for (uint256 i = 0; i < length; i++) {
-                MultiDelegatedAttestationRequest calldata multiDelegatedRequest = multiDelegatedRequests[i];
-                AttestationRequestData[] calldata data = multiDelegatedRequest.data;
+                MultiDelegatedRecordRequest calldata multiDelegatedRequest = multiDelegatedRequests[i];
+                RecordRequestData[] calldata data = multiDelegatedRequest.data;
 
                 // Ensure that no inputs are missing.
                 uint256 dataLength = data.length;
@@ -263,8 +252,8 @@ contract AttestationRegistry is
 
                 // Verify signatures. Please note that the signatures are assumed to be signed with increasing nonces.
                 for (uint256 j = 0; j < dataLength; j++) {
-                    _verifyAttestSig(
-                        DelegatedAttestationRequest({
+                    _verifyRegisterSig(
+                        DelegatedRecordRequest({
                             schema: multiDelegatedRequest.schema,
                             data: data[j],
                             signature: multiDelegatedRequest.signatures[j],
@@ -274,9 +263,9 @@ contract AttestationRegistry is
                     );
                 }
 
-                // Process the current batch of attestations.
+                // Process the current batch of records.
                 uint256 registrar = idRegistry.idOf(msg.sender);
-                AttestationsResult memory res = _attest({
+                RecordsResult memory res = _register({
                     schemaUID: multiDelegatedRequest.schema,
                     data: data,
                     originator: multiDelegatedRequest.originator,
@@ -301,7 +290,17 @@ contract AttestationRegistry is
         return _mergeUIDs(totalUIDs, totalUIDCount);
     }
 
-    /// @inheritdoc IAttestationRegistry
+    //  TODO:
+    // update()?
+    // updateByDelegation()?
+    // multiUpdate()?
+    // multiUpdateByDelegation()?
+
+    // TODO: unrevoke()?
+    // unrevokeByDelegation()?
+    // multiUnrevoke()?
+    // multiUnrevokeByDelegation()?
+    /// @inheritdoc IRecordRegistry
     function revoke(uint256 revoker, RevocationRequest calldata request) external payable override {
         RevocationRequestData[] memory data = new RevocationRequestData[](1);
         data[0] = request.data;
@@ -316,7 +315,7 @@ contract AttestationRegistry is
         });
     }
 
-    /// @inheritdoc IAttestationRegistry
+    /// @inheritdoc IRecordRegistry
     function revokeByDelegation(DelegatedRevocationRequest calldata delegatedRequest) external payable override {
         _verifyRevokeSig(delegatedRequest);
 
@@ -333,7 +332,7 @@ contract AttestationRegistry is
         });
     }
 
-    /// @inheritdoc IAttestationRegistry
+    /// @inheritdoc IRecordRegistry
     function multiRevoke(uint256 revoker, MultiRevocationRequest[] calldata multiRequests) external payable override {
         // We are keeping track of the total available ETH amount that can be sent to resolvers and will keep deducting
         // from it to verify that there isn't any attempt to send too much ETH to resolvers. Please note that unless
@@ -363,7 +362,7 @@ contract AttestationRegistry is
         }
     }
 
-    /// @inheritdoc IAttestationRegistry
+    /// @inheritdoc IRecordRegistry
     function multiRevokeByDelegation(MultiDelegatedRevocationRequest[] calldata multiDelegatedRequests)
         external
         payable
@@ -417,13 +416,13 @@ contract AttestationRegistry is
         }
     }
 
-    /// @inheritdoc IAttestationRegistry
+    /// @inheritdoc IRecordRegistry
     function timestamp(bytes32 data) external override returns (uint64 time) {
         time = uint64(block.timestamp);
         _timestamp(data, time);
     }
 
-    /// @inheritdoc IAttestationRegistry
+    /// @inheritdoc IRecordRegistry
     function revokeOffchain(uint256 revoker, bytes32 data) external override returns (uint64) {
         uint64 time = uint64(block.timestamp);
         uint256 registrar = canRevoke(revoker);
@@ -433,7 +432,7 @@ contract AttestationRegistry is
         return time;
     }
 
-    /// @inheritdoc IAttestationRegistry
+    /// @inheritdoc IRecordRegistry
     function multiRevokeOffchain(uint256 revoker, bytes32[] calldata data) external override returns (uint64) {
         uint64 time = uint64(block.timestamp);
         uint256 registrar = canRevoke(revoker);
@@ -448,17 +447,17 @@ contract AttestationRegistry is
         return time;
     }
 
-    /// @inheritdoc IAttestationRegistry
-    function canAttest(uint256 originator) public view override returns (uint256 registrar) {
+    /// @inheritdoc IRecordRegistry
+    function canRegister(uint256 originator) public view override returns (uint256 registrar) {
         registrar = idRegistry.idOf(msg.sender);
-        bool canAct = idRegistry.canAct(originator, registrar, address(this), "attest");
+        bool canAct = idRegistry.canAct(originator, registrar, address(this), "register");
 
         if (!canAct) {
             revert AccessDenied();
         }
     }
 
-    /// @inheritdoc IAttestationRegistry
+    /// @inheritdoc IRecordRegistry
     function canRevoke(uint256 revoker) public view override returns (uint256 registrar) {
         registrar = idRegistry.idOf(msg.sender);
         bool canAct = idRegistry.canAct(revoker, registrar, address(this), "revoke");
@@ -468,7 +467,7 @@ contract AttestationRegistry is
         }
     }
 
-    /// @inheritdoc IAttestationRegistry
+    /// @inheritdoc IRecordRegistry
     function multiTimestamp(bytes32[] calldata data) external override returns (uint64 time) {
         time = uint64(block.timestamp);
 
@@ -480,22 +479,34 @@ contract AttestationRegistry is
         }
     }
 
-    /// @inheritdoc IAttestationRegistry
-    function getAttestation(bytes32 uid) external view override returns (Attestation memory) {
+    /// @inheritdoc IRecordRegistry
+    function getRecord(bytes32 uid) external view override returns (Record memory) {
         return _db[uid];
     }
 
-    /// @inheritdoc IAttestationRegistry
-    function isAttestationValid(bytes32 uid) public view override returns (bool) {
+    /// @inheritdoc IRecordRegistry
+    function getRecords(bytes32[] calldata uid) external view override returns (Record[] memory records) {
+        uint256 length = uid.length;
+        records = new Record[](length);
+
+        unchecked {
+            for (uint256 i = 0; i < length; i++) {
+                records[i] = _db[uid[i]];
+            }
+        }
+    }
+
+    /// @inheritdoc IRecordRegistry
+    function isRecordValid(bytes32 uid) public view override returns (bool) {
         return _db[uid].uid != EMPTY_UID;
     }
 
-    /// @inheritdoc IAttestationRegistry
+    /// @inheritdoc IRecordRegistry
     function getTimestamp(bytes32 data) external view override returns (uint64 time) {
         return _timestamps[data];
     }
 
-    /// @inheritdoc IAttestationRegistry
+    /// @inheritdoc IRecordRegistry
     function getRevokeOffchain(uint256 revoker, bytes32 data)
         external
         view
@@ -505,81 +516,85 @@ contract AttestationRegistry is
         return _revocationsOffchain[revoker][data];
     }
 
-    /// @dev Attests to a specific schema.
-    /// @param schemaUID The unique identifier of the schema to attest to.
-    /// @param data The arguments of the attestation requests.
-    /// @param originator The attesting account.
+    /// @dev Registers a new record utilizing a specific schema.
+    /// @param schemaUID The unique identifier of the schema used.
+    /// @param data The arguments of the record requests.
+    /// @param originator The authoring account.
     /// @param registrar The registrar account.
     /// @param availableValue The total available ETH amount that can be sent to the resolver.
-    /// @return The UID of the new attestations and the total sent ETH amount.
-    function _attest(
+    /// @return The UID of the new records and the total sent ETH amount.
+    function _register(
         bytes32 schemaUID,
-        AttestationRequestData[] memory data,
+        RecordRequestData[] memory data,
         uint256 originator,
         uint256 registrar,
         uint256 availableValue
-    ) private returns (AttestationsResult memory) {
+    ) internal returns (RecordsResult memory) {
         uint256 length = data.length;
 
-        AttestationsResult memory res;
+        RecordsResult memory res;
         res.uids = new bytes32[](length);
 
-        // Ensure that we aren't attempting to attest to a non-existing schema.
-        SchemaRecord memory schemaRecord = schemaRegistry.getSchema(schemaUID);
-        if (schemaRecord.uid == EMPTY_UID) {
+        // Ensure that we aren't attempting to register a record utilizing a non-existing schema.
+        Schema memory schema = schemaRegistry.getSchema(schemaUID);
+        if (schema.uid == EMPTY_UID) {
             revert InvalidSchema();
         }
 
-        Attestation[] memory attestations = new Attestation[](length);
+        // Ensure originator and registrar are non-zero
+        if (originator == 0 || registrar == 0) {
+            revert InvalidAccount();
+        }
+
+        Record[] memory records = new Record[](length);
         uint256[] memory values = new uint256[](length);
 
         unchecked {
             for (uint256 i = 0; i < length; i++) {
-                AttestationRequestData memory request = data[i];
+                RecordRequestData memory request = data[i];
 
-                // Ensure that either no expiration time was set or that it was set in the future.
-                uint64 time = uint64(block.timestamp);
-                if (request.expirationTime != NO_EXPIRATION_TIME && request.expirationTime <= time) {
-                    revert InvalidExpirationTime();
-                }
-
-                // Ensure that we aren't trying to make a revocable attestation for a non-revocable schema.
-                if (!schemaRecord.revocable && request.revocable) {
+                // Ensure that we aren't trying to make a revocable record for a non-revocable schema.
+                if (!schema.revocable && request.revocable) {
                     revert Irrevocable();
                 }
 
-                Attestation memory attestation = Attestation({
+                // Ensure we aren't trying to make an updatable record for a non-updatable schema.
+                if (!schema.updatable && request.updatable) {
+                    revert Nonupdatable();
+                }
+
+                Record memory record = Record({
                     uid: EMPTY_UID,
                     schema: schemaUID,
                     time: uint64(block.timestamp),
-                    expirationTime: request.expirationTime,
                     revocationTime: 0,
                     originator: originator,
                     registrar: registrar,
                     revocable: request.revocable,
+                    updatable: request.updatable,
                     data: request.data
                 });
 
-                bytes32 uid = _getUID(attestation);
+                bytes32 uid = _getUID(record, request.salt);
                 if (_db[uid].uid != EMPTY_UID) {
-                    revert AlreadyAttested();
+                    revert AlreadyRegistered();
                 }
 
-                attestation.uid = uid;
-                _db[uid] = attestation;
+                record.uid = uid;
+                _db[uid] = record;
 
-                attestations[i] = attestation;
+                records[i] = record;
                 values[i] = request.value;
 
                 res.uids[i] = uid;
 
-                emit Attested(originator, registrar, uid, schemaUID);
+                emit RecordRegistered(schemaUID, originator, registrar, uid);
             }
         }
 
-        res.usedValue = _resolveAttestations({
-            schemaRecord: schemaRecord,
-            attestations: attestations,
+        res.usedValue = _resolveRecords({
+            schema: schema,
+            records: records,
             values: values,
             isRevocation: false,
             availableValue: availableValue
@@ -588,8 +603,8 @@ contract AttestationRegistry is
         return res;
     }
 
-    /// @dev Revokes an existing attestation to a specific schema.
-    /// @param schemaUID The unique identifier of the schema to attest to.
+    /// @dev Revokes an existing record(s) utilizing a specific schema.
+    /// @param schemaUID The unique identifier of the schema utilized.
     /// @param data The arguments of the revocation requests.
     /// @param revoker The revoking account.
     /// @param availableValue The total available ETH amount that can be sent to the resolver.
@@ -600,80 +615,85 @@ contract AttestationRegistry is
         uint256 revoker,
         uint256 registrar,
         uint256 availableValue
-    ) private returns (uint256 usedValue) {
+    ) internal returns (uint256 usedValue) {
         // Ensure that a non-existing schema ID wasn't passed by accident.
-        SchemaRecord memory schemaRecord = schemaRegistry.getSchema(schemaUID);
-        if (schemaRecord.uid == EMPTY_UID) {
+        Schema memory schema = schemaRegistry.getSchema(schemaUID);
+        if (schema.uid == EMPTY_UID) {
             revert InvalidSchema();
         }
 
+        // Ensure revoker and registrar are non-zero
+        if (revoker == 0 || registrar == 0) {
+            revert InvalidAccount();
+        }
+
         uint256 length = data.length;
-        Attestation[] memory attestations = new Attestation[](length);
+        Record[] memory records = new Record[](length);
         uint256[] memory values = new uint256[](length);
 
         unchecked {
             for (uint256 i = 0; i < length; i++) {
                 RevocationRequestData memory request = data[i];
-                Attestation storage attestation = _db[request.uid];
+                Record storage record = _db[request.uid];
 
-                // Ensure that we aren't attempting to revoke a non-existing attestation.
-                if (attestation.uid == EMPTY_UID) {
+                // Ensure that we aren't attempting to revoke a non-existing record.
+                if (record.uid == EMPTY_UID) {
                     revert NotFound();
                 }
 
                 // Ensure that a wrong schema ID wasn't passed by accident.
-                if (attestation.schema != schemaUID) {
+                if (record.schema != schemaUID) {
                     revert InvalidSchema();
                 }
 
-                // Allow only original attesters to revoke their attestations.
-                if (attestation.originator != revoker) {
+                // Allow only the author/originator to revoke their records.
+                if (record.originator != revoker) {
                     revert AccessDenied();
                 }
 
                 // Please note that also checking of the schema itself is revocable is unnecessary, since it's not possible to
-                // make revocable attestations to an irrevocable schema.
-                if (!attestation.revocable) {
+                // make revocable records to an irrevocable schema.
+                if (!record.revocable) {
                     revert Irrevocable();
                 }
 
-                // Ensure that we aren't trying to revoke the same attestation twice.
-                if (attestation.revocationTime != 0) {
+                // Ensure that we aren't trying to revoke the same record twice.
+                if (record.revocationTime != 0) {
                     revert AlreadyRevoked();
                 }
 
-                // Actually revoke the attestation
-                attestation.revocationTime = uint64(block.timestamp);
-                attestations[i] = attestation;
+                // Actually revoke the record
+                record.revocationTime = uint64(block.timestamp);
+                records[i] = record;
                 values[i] = request.value;
-                emit Revoked(revoker, registrar, request.uid, schemaUID);
+                emit RecordRevoked(schemaUID, revoker, registrar, request.uid);
             }
         }
 
-        return _resolveAttestations({
-            schemaRecord: schemaRecord,
-            attestations: attestations,
+        return _resolveRecords({
+            schema: schema,
+            records: records,
             values: values,
             isRevocation: true,
             availableValue: availableValue
         });
     }
 
-    /// @dev Resolves a new attestation or a revocation of an existing attestation.
-    /// @param schemaRecord The schema of the attestation.
-    /// @param attestation The data of the attestation to make/revoke.
+    /// @dev Resolves a new record or a revocation of an existing record.
+    /// @param schema The schema of the record.
+    /// @param record The data of the record to make/revoke.
     /// @param value An explicit ETH amount to send to the resolver.
-    /// @param isRevocation Whether to resolve an attestation or its revocation.
+    /// @param isRevocation Whether to resolve an record or its revocation.
     /// @param availableValue The total available ETH amount that can be sent to the resolver.
     /// @return Returns the total sent ETH amount.
-    function _resolveAttestation(
-        SchemaRecord memory schemaRecord,
-        Attestation memory attestation,
+    function _resolveRecord(
+        Schema memory schema,
+        Record memory record,
         uint256 value,
         bool isRevocation,
         uint256 availableValue
-    ) private returns (uint256) {
-        ISchemaResolver resolver = schemaRecord.resolver;
+    ) internal returns (uint256) {
+        ISchemaResolver resolver = schema.resolver;
         if (address(resolver) == address(0)) {
             // Ensure that we don't accept payments if there is no resolver.
             if (value != 0) {
@@ -689,7 +709,7 @@ contract AttestationRegistry is
                 revert NotPayable();
             }
 
-            // Ensure that the attester/revoker doesn't try to spend more than available.
+            // Ensure that the originator/revoker doesn't try to spend more than available.
             if (value > availableValue) {
                 revert InsufficientValue();
             }
@@ -701,43 +721,43 @@ contract AttestationRegistry is
         }
 
         if (isRevocation) {
-            if (!resolver.revoke{value: value}(attestation)) {
+            if (!resolver.revoke{value: value}(record)) {
                 revert InvalidRevocation();
             }
-        } else if (!resolver.attest{value: value}(attestation)) {
-            revert InvalidAttestation();
+        } else if (!resolver.register{value: value}(record)) {
+            revert InvalidRecord();
         }
 
         return value;
     }
 
-    /// @dev Resolves multiple attestations or revocations of existing attestations.
-    /// @param schemaRecord The schema of the attestation.
-    /// @param attestations The data of the attestations to make/revoke.
+    /// @dev Resolves multiple records or revocations of existing records.
+    /// @param schema The schema of the record.
+    /// @param records The data of the records to make/revoke.
     /// @param values Explicit ETH amounts to send to the resolver.
-    /// @param isRevocation Whether to resolve an attestation or its revocation.
+    /// @param isRevocation Whether to resolve an record or its revocation.
     /// @param availableValue The total available ETH amount that can be sent to the resolver.
     /// @return usedValue Returns the total sent ETH amount.
-    function _resolveAttestations(
-        SchemaRecord memory schemaRecord,
-        Attestation[] memory attestations,
+    function _resolveRecords(
+        Schema memory schema,
+        Record[] memory records,
         uint256[] memory values,
         bool isRevocation,
         uint256 availableValue
-    ) private returns (uint256 usedValue) {
+    ) internal returns (uint256 usedValue) {
         // NOTE: No need to compare values.length, because the caller guarantees they are the same length.
-        uint256 length = attestations.length;
+        uint256 length = records.length;
         if (length == 1) {
-            return _resolveAttestation({
-                schemaRecord: schemaRecord,
-                attestation: attestations[0],
+            return _resolveRecord({
+                schema: schema,
+                record: records[0],
                 value: values[0],
                 isRevocation: isRevocation,
                 availableValue: availableValue
             });
         }
 
-        ISchemaResolver resolver = schemaRecord.resolver;
+        ISchemaResolver resolver = schema.resolver;
         if (address(resolver) == address(0)) {
             // Ensure that we don't accept payments if there is no resolver.
             unchecked {
@@ -767,7 +787,7 @@ contract AttestationRegistry is
                     revert NotPayable();
                 }
 
-                // Ensure that the attester/revoker doesn't try to spend more than available.
+                // Ensure that the originator/revoker doesn't try to spend more than available.
                 if (value > availableValue) {
                     revert InsufficientValue();
                 }
@@ -779,38 +799,28 @@ contract AttestationRegistry is
         }
 
         if (isRevocation) {
-            if (!resolver.multiRevoke{value: totalUsedValue}(attestations, values)) {
+            if (!resolver.multiRevoke{value: totalUsedValue}(records, values)) {
                 revert InvalidRevocations();
             }
-        } else if (!resolver.multiAttest{value: totalUsedValue}(attestations, values)) {
-            revert InvalidAttestations();
+        } else if (!resolver.multiRegister{value: totalUsedValue}(records, values)) {
+            revert InvalidRecords();
         }
 
         return totalUsedValue;
     }
 
-    /// @dev Calculates a UID for a given attestation.
-    /// @param attestation The input attestation.
-    /// @return uid Attestation UID.
-    function _getUID(Attestation memory attestation) private pure returns (bytes32 uid) {
-        return keccak256(
-            abi.encodePacked(
-                attestation.schema,
-                attestation.time,
-                attestation.expirationTime,
-                attestation.originator,
-                attestation.registrar,
-                attestation.revocable,
-                attestation.data
-            )
-        );
+    /// @dev Calculates a UID for a given record.
+    /// @param record The input record.
+    /// @return uid Record UID.
+    function _getUID(Record memory record, bytes32 salt) internal pure returns (bytes32 uid) {
+        return keccak256(abi.encodePacked(record.originator, record.registrar, record.schema, record.data, salt));
     }
 
-    /// @dev Refunds remaining ETH amount to the attester.
+    /// @dev Refunds remaining ETH amount to the caller.
     /// @param remainingValue The remaining ETH amount that was not sent to the resolver.
-    function _refund(uint256 remainingValue) private {
+    function _refund(uint256 remainingValue) internal {
         if (remainingValue > 0) {
-            // Using a regular transfer here might revert, for some non-EOA attesters, due to exceeding of the 2300
+            // Using a regular transfer here might revert, for some non-EOA callers, due to exceeding of the 2300
             // gas limit which is why we're using call instead (via sendValue), which the 2300 gas limit does not
             // apply for.
             (bool sent,) = payable(msg.sender).call{value: remainingValue}("");
@@ -821,7 +831,7 @@ contract AttestationRegistry is
     /// @dev Timestamps the specified bytes32 data.
     /// @param data The data to timestamp.
     /// @param time The timestamp.
-    function _timestamp(bytes32 data, uint64 time) private {
+    function _timestamp(bytes32 data, uint64 time) internal {
         if (_timestamps[data] != 0) {
             revert AlreadyTimestamped();
         }
@@ -834,7 +844,7 @@ contract AttestationRegistry is
     /// @param revoker The revoking account.
     /// @param data The data to revoke.
     /// @param time The timestamp the data was revoked with.
-    function _revokeOffchain(uint256 revoker, uint256 registrar, bytes32 data, uint64 time) private {
+    function _revokeOffchain(uint256 revoker, uint256 registrar, bytes32 data, uint64 time) internal {
         if (_revocationsOffchain[revoker][data] != 0) {
             revert AlreadyRevokedOffchain();
         }
@@ -847,7 +857,7 @@ contract AttestationRegistry is
     /// @param uidLists The provided lists of UIDs.
     /// @param uidCount Total UID count.
     /// @return uids A merged and flatten list of all the UIDs.
-    function _mergeUIDs(bytes32[][] memory uidLists, uint256 uidCount) private pure returns (bytes32[] memory uids) {
+    function _mergeUIDs(bytes32[][] memory uidLists, uint256 uidCount) internal pure returns (bytes32[] memory uids) {
         uids = new bytes32[](uidCount);
         uint256 currentIndex = 0;
         uint256 uidListLength = uidLists.length;
@@ -869,21 +879,21 @@ contract AttestationRegistry is
     //                       SIGNATURE HELPERS
     // =============================================================
 
-    /// @dev Verify the EIP712 signature for a Attest transaction.
-    function _verifyAttestSig(DelegatedAttestationRequest memory request) internal {
+    /// @dev Verify the EIP712 signature for a Register transaction.
+    function _verifyRegisterSig(DelegatedRecordRequest memory request) internal {
         uint256 originator = request.originator;
         address custody = idRegistry.custodyOf(originator);
 
-        AttestationRequestData memory data = request.data;
+        RecordRequestData memory data = request.data;
 
         bytes32 digest = _hashTypedData(
             keccak256(
                 abi.encode(
-                    ATTEST_TYPEHASH,
+                    REGISTER_TYPEHASH,
                     originator,
                     request.schema,
-                    data.expirationTime,
                     data.revocable,
+                    data.updatable,
                     keccak256(data.data),
                     data.value,
                     _useNonce(custody),

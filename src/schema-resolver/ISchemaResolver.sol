@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Attestation} from "./../Common.sol";
+import {Record} from "./../Common.sol";
 
 /// @title ISchemaResolver
 /// @notice The interface of an optional schema resolver.
@@ -10,30 +10,30 @@ interface ISchemaResolver {
     /// @return Whether the resolver supports ETH transfers.
     function isPayable() external pure returns (bool);
 
-    /// @notice Processes an attestation and verifies whether it's valid.
-    /// @param attestation The new attestation.
-    /// @return isValid Whether the attestation is valid.
-    function attest(Attestation calldata attestation) external payable returns (bool isValid);
+    /// @notice Processes an record and verifies whether it's valid.
+    /// @param record The new record.
+    /// @return isValid Whether the record is valid.
+    function register(Record calldata record) external payable returns (bool isValid);
 
-    /// @notice Processes multiple attestations and verifies whether they are valid.
-    /// @param attestations The new attestations.
-    /// @param values Explicit ETH amounts which were sent with each attestation.
-    /// @return isValid Whether all the attestations are valid.
-    function multiAttest(Attestation[] calldata attestations, uint256[] calldata values)
+    /// @notice Processes multiple records and verifies whether they are valid.
+    /// @param records The new records.
+    /// @param values Explicit ETH amounts which were sent with each record.
+    /// @return isValid Whether all the records are valid.
+    function multiRegister(Record[] calldata records, uint256[] calldata values)
         external
         payable
         returns (bool isValid);
 
-    /// @notice Processes an attestation revocation and verifies if it can be revoked.
-    /// @param attestation The existing attestation to be revoked.
-    /// @return isRevocable Whether the attestation can be revoked.
-    function revoke(Attestation calldata attestation) external payable returns (bool isRevocable);
+    /// @notice Processes an record revocation and verifies if it can be revoked.
+    /// @param record The existing record to be revoked.
+    /// @return isRevocable Whether the record can be revoked.
+    function revoke(Record calldata record) external payable returns (bool isRevocable);
 
-    /// @notice Processes revocation of multiple attestation and verifies they can be revoked.
-    /// @param attestations The existing attestations to be revoked.
+    /// @notice Processes revocation of multiple record and verifies they can be revoked.
+    /// @param records The existing records to be revoked.
     /// @param values Explicit ETH amounts which were sent with each revocation.
-    /// @return isRevocable Whether the attestations can be revoked.
-    function multiRevoke(Attestation[] calldata attestations, uint256[] calldata values)
+    /// @return isRevocable Whether the records can be revoked.
+    function multiRevoke(Record[] calldata records, uint256[] calldata values)
         external
         payable
         returns (bool isRevocable);

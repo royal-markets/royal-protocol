@@ -18,8 +18,8 @@ import {IDelegateRegistry} from "../src/delegation/IDelegateRegistry.sol";
 import {SchemaRegistry} from "../src/SchemaRegistry.sol";
 import {ISchemaRegistry} from "../src/interfaces/ISchemaRegistry.sol";
 
-import {AttestationRegistry} from "../src/AttestationRegistry.sol";
-import {IAttestationRegistry} from "../src/interfaces/IAttestationRegistry.sol";
+import {RecordRegistry} from "../src/RecordRegistry.sol";
+import {IRecordRegistry} from "../src/interfaces/IRecordRegistry.sol";
 
 import {ERC721Mock} from "./Utils.sol";
 
@@ -54,7 +54,7 @@ abstract contract ProvenanceTest is Test {
 
     // TODO: Update these when we have canonical addresses
     address public constant SCHEMA_REGISTRY_ADDR = 0xb2012A96896b8CCAAfe1686f7503a4163d5d5492;
-    address public constant ATTESTATION_REGISTRY_ADDR = 0x1fd723800b20d93aD8eb8E93b0f706531Df4bEe0;
+    address public constant RECORD_REGISTRY_ADDR = 0x1fd723800b20d93aD8eb8E93b0f706531Df4bEe0;
 
     bytes32 internal constant _ERC1967_IMPLEMENTATION_SLOT =
         0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
@@ -74,7 +74,7 @@ abstract contract ProvenanceTest is Test {
     address public immutable DELEGATE_REGISTRY_OWNER;
 
     address public immutable SCHEMA_REGISTRY_OWNER;
-    address public immutable ATTESTATION_REGISTRY_OWNER;
+    address public immutable RECORD_REGISTRY_OWNER;
 
     // =============================================================
     //                           STORAGE
@@ -88,7 +88,7 @@ abstract contract ProvenanceTest is Test {
     DelegateRegistry public delegateRegistry;
 
     SchemaRegistry public schemaRegistry;
-    AttestationRegistry public attestationRegistry;
+    RecordRegistry public recordRegistry;
 
     // Track registered usernames to ensure uniqueness.
     mapping(string username => bool isRegistered) internal _registeredUsernames;
@@ -109,7 +109,7 @@ abstract contract ProvenanceTest is Test {
         DELEGATE_REGISTRY_OWNER = vm.addr(0x08);
 
         SCHEMA_REGISTRY_OWNER = vm.addr(0x09);
-        ATTESTATION_REGISTRY_OWNER = vm.addr(0x0A);
+        RECORD_REGISTRY_OWNER = vm.addr(0x0A);
     }
 
     // =============================================================
@@ -189,18 +189,16 @@ abstract contract ProvenanceTest is Test {
         vm.etch(address(SCHEMA_REGISTRY_ADDR), proxyCode);
         vm.store(address(SCHEMA_REGISTRY_ADDR), _ERC1967_IMPLEMENTATION_SLOT, bytes32(uint256(uint160(implementation))));
         schemaRegistry = SchemaRegistry(SCHEMA_REGISTRY_ADDR);
-        schemaRegistry.initialize(SCHEMA_REGISTRY_OWNER, address(idRegistry));
+        schemaRegistry.initialize(idRegistry, SCHEMA_REGISTRY_OWNER);
 
-        // Set up AttestationRegistry
-        implementation = address(new AttestationRegistry());
+        // Set up RecordRegistry
+        implementation = address(new RecordRegistry());
         proxy = LibClone.deployERC1967(implementation);
         proxyCode = address(proxy).code;
-        vm.etch(address(ATTESTATION_REGISTRY_ADDR), proxyCode);
-        vm.store(
-            address(ATTESTATION_REGISTRY_ADDR), _ERC1967_IMPLEMENTATION_SLOT, bytes32(uint256(uint160(implementation)))
-        );
-        attestationRegistry = AttestationRegistry(ATTESTATION_REGISTRY_ADDR);
-        attestationRegistry.initialize(ATTESTATION_REGISTRY_OWNER, address(schemaRegistry), address(idRegistry));
+        vm.etch(address(RECORD_REGISTRY_ADDR), proxyCode);
+        vm.store(address(RECORD_REGISTRY_ADDR), _ERC1967_IMPLEMENTATION_SLOT, bytes32(uint256(uint160(implementation))));
+        recordRegistry = RecordRegistry(RECORD_REGISTRY_ADDR);
+        recordRegistry.initialize(schemaRegistry, idRegistry, RECORD_REGISTRY_OWNER);
     }
 
     // =============================================================

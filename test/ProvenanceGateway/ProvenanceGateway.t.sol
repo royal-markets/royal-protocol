@@ -554,7 +554,45 @@ contract ProvenanceGatewayTest is ProvenanceTest {
     // testFuzz_registerFor();
     // testFuzz_registerFor_RevertWhenPaused();
     // testFuzz_registerFor_RevertWhenOriginatorDoesNotExist();
-    // testFuzz_registerFor_RevertWhenRegistrarDoesNotExist();
+
+    function testFuzz_registerFor_RevertWhenRegistrarDoesNotExist(
+        uint256 originatorPk_,
+        address registrar,
+        bytes32 contentHash,
+        uint256 blockNumber,
+        uint40 deadline_
+    ) public {
+        // Bound inputs that need to be bound
+        uint256 originatorPk = _boundPk(originatorPk_);
+        address originator = vm.addr(originatorPk);
+        vm.assume(registrar != address(0));
+        uint256 deadline = _boundDeadline(deadline_);
+
+        // Register the originator.
+        uint256 originatorId = _register(originator, "originator");
+
+        // NOTE: registrar explicitly doesn't have a registered ID.
+
+        // Roll the block number forward to simulate the block number at the time of registration.
+        vm.roll(blockNumber);
+
+        // Assert preconditions.
+        address nftContract = address(0);
+        uint256 nftTokenId = 0;
+        uint256 expectedId = 1;
+        _assertRegisterPreconditions(expectedId, originatorId, contentHash, nftContract, nftTokenId);
+
+        // Generate signature for the registerFor transaction.
+        bytes memory sig = _signRegister(originatorPk, originatorId, contentHash, nftContract, nftTokenId, deadline);
+
+        // Call .registerFor
+        // TODO: What error specifically?
+        vm.expectRevert(RegistrarDoesNotExist.selector);
+        vm.prank(registrar);
+        provenanceGateway.registerFor(originatorId, contentHash, nftContract, nftTokenId, deadline, sig);
+    }
+
+    // TODO:
     // testFuzz_registerFor_RevertWhenNftNotOwnedByOriginator();
     // testFuzz_registerFor_RevertWhenNftTokenAlreadyUsed();
     // testFuzz_registerFor_RevertWhenContentHashAlreadyRegistered();
@@ -666,4 +704,34 @@ contract ProvenanceGatewayTest is ProvenanceTest {
     // =============================================================
     //                        SIGNATURE HELPERS
     // =============================================================
+
+    /// @dev Sign the EIP712 message for a registerFor transaction.
+    function _signRegister(
+        uint256 pk,
+        uint256 originatorId,
+        bytes32 contentHash,
+        address nftContract,
+        uint256 nftTokenId,
+        uint256 deadline
+    ) internal view returns (bytes memory signature) {
+        address originator = vm.addr(pk);
+
+        bytes32 digest = provenanceGateway.hashTypedData(
+            keccak256(
+                abi.encode(
+                    provenanceGateway.REGISTER_TYPEHASH(),
+                    originatorId,
+                    contentHash,
+                    nftContract,
+                    nftTokenId,
+                    provenanceGateway.nonces(originator),
+                    deadline
+                )
+            )
+        );
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, digest);
+        signature = abi.encodePacked(r, s, v);
+        assertEq(signature.length, 65);
+    }
 }
